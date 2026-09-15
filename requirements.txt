@@ -1,0 +1,8 @@
+fastapi==0.115.*
+uvicorn==0.32.*
+jinja2==3.1.*
+python-multipart==0.0.*
+httpx==0.28.*
+beautifulsoup4==4.12.*
+apscheduler==3.10.*
+tzdata

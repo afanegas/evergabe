@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Ausschreibungen{% endblock %} · eV-Checker</title>
+  <link rel="stylesheet" href="{{ asset('style.css') }}">
+</head>
+<body data-page="{% block page %}{% endblock %}">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">eV</span>-Checker</a>
+    <nav>
+      <a href="/" class="{% if self.page() == 'list' %}active{% endif %}">Ausschreibungen</a>
+      <a href="/einstellungen" class="{% if self.page() == 'settings' %}active{% endif %}">Einstellungen</a>
+    </nav>
+    <form method="post" action="/abrufen" class="fetch-form">
+      <input type="hidden" name="next" value="{% block next_url %}/{% endblock %}">
+      <button type="submit" class="btn btn-light" {% if fetch_state.running %}disabled{% endif %}>Jetzt abrufen</button>
+    </form>
+  </header>
+
+  <div id="fetch-banner" class="banner banner-info" {% if not fetch_state.running %}hidden{% endif %}>
+    <span class="spinner"></span>
+    <span id="fetch-text">Abruf läuft{% if fetch_state.phase %} – {{ fetch_state.phase }}{% endif %}{% if fetch_state.total %} ({{ fetch_state.done }}/{{ fetch_state.total }}){% endif %}</span>
+  </div>
+
+  <main class="container">
+    {% set warnings = source_warnings() %}
+    {% if warnings %}
+      <div class="banner banner-error source-warning" role="alert">
+        <strong>⚠ Quelle{{ 'n' if warnings | length > 1 }} nicht erreichbar – es kommen eventuell keine neuen Einträge:</strong>
+        <ul>
+          {% for w in warnings %}
+            <li>
+              <strong>{{ w.label }}</strong>: {{ w.failures }}× hintereinander fehlgeschlagen{% if w.since %}, seit {{ w.since | dt }}{% endif %}
+              {% if w.error %}<br><small>Letzter Fehler: {{ w.error }}</small>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        <small>Die Warnung verschwindet nach dem nächsten erfolgreichen Abruf. <a href="/einstellungen#feeds">Feeds prüfen</a></small>
+      </div>
+    {% endif %}
+    {% if meldung %}<div class="banner banner-success">{{ meldung }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ asset('app.js') }}"></script>
+</body>
+</html>

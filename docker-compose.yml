@@ -1,0 +1,44 @@
+# eV-Checker hinter Traefik 3 (läuft separat, Netzwerk "traefik_proxy").
+# Alle persönlichen Werte (Domain, Passwort-Hash, SMTP) stehen in der .env – siehe .env.example.
+#
+# Start / Update:  git pull && docker compose up -d --build
+
+services:
+  ev-checker:
+    build: .
+    image: ev-checker:local
+    container_name: ev-checker
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - EVC_BASE_URL=https://${EVC_DOMAIN}
+      - EVC_SMTP_HOST=${EVC_SMTP_HOST:-}
+      - EVC_SMTP_PORT=${EVC_SMTP_PORT:-587}
+      - EVC_SMTP_SECURITY=${EVC_SMTP_SECURITY:-starttls}
+      - EVC_SMTP_USER=${EVC_SMTP_USER:-}
+      - EVC_SMTP_PASSWORD=${EVC_SMTP_PASSWORD:-}
+      - EVC_SMTP_FROM=${EVC_SMTP_FROM:-}
+      - EVC_BACKUP_TIME=${EVC_BACKUP_TIME:-03:00}
+      - EVC_BACKUP_KEEP=${EVC_BACKUP_KEEP:-14}
+    volumes:
+      - ./data:/data
+#    ports:
+#      - 8765:8000
+    networks:
+      - traefik_proxy
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ev-checker.rule=Host(`${EVC_DOMAIN}`)"
+      - "traefik.http.routers.ev-checker.entrypoints=websecure"
+      - "traefik.http.routers.ev-checker.tls=true"
+      - "traefik.http.routers.ev-checker.tls.certresolver=le"
+      - "traefik.http.routers.ev-checker.middlewares=ev-checker-auth"
+      - "traefik.http.middlewares.ev-checker-auth.basicauth.users=${EVC_BASIC_AUTH}"
+      - "traefik.http.services.ev-checker.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik_proxy"
+
+networks:
+  traefik_proxy:
+    external: true

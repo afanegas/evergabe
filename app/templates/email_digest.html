@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>eV-Checker</title></head>
+<body style="margin:0;padding:0;background:#f6f5f2;font-family:Segoe UI,Roboto,Arial,sans-serif;color:#1d1d1b;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f5f2;">
+<tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;background:#ffffff;border:1px solid #e2e0da;border-radius:8px;">
+  <tr><td style="background:#1d1d1b;color:#ffffff;padding:14px 20px;border-radius:8px 8px 0 0;font-size:18px;font-weight:700;">
+    <span style="color:#e8710a;">eV</span>-Checker
+  </td></tr>
+  <tr><td style="padding:18px 20px 6px;">
+    {% if test %}<p style="margin:0 0 10px;padding:8px 10px;background:#fff4d6;color:#9a5b00;border-radius:6px;font-size:13px;">Test-Mail – enthält die Treffer der letzten 24 Stunden.</p>{% endif %}
+    <h1 style="margin:0 0 4px;font-size:20px;">{{ total }} neue interessante Treffer</h1>
+    {% if important %}<p style="margin:0;color:#8a4b00;font-size:14px;">davon ★ {{ important }} wichtig</p>{% endif %}
+  </td></tr>
+  {% for r in regions %}
+  <tr><td style="padding:14px 20px 4px;">
+    <h2 style="margin:0;padding:6px 10px;background:#1d1d1b;color:#ffffff;border-radius:6px;font-size:15px;">{{ r.label }} <span style="font-weight:400;color:#d6d4ce;">({{ r["items"] | length + r.more }})</span></h2>
+  </td></tr>
+  {% for item in r["items"] %}
+  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else item.url %}
+  <tr><td style="padding:8px 20px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-left:3px solid {{ '#e8710a' if item.important else ('#b8b6b0' if item.low_priority else '#1f7a45') }};{{ 'background:#fffaf2;' if item.important else '' }}">
+      <tr><td style="padding:6px 10px;">
+        {% if item.important %}<span style="font-size:11px;font-weight:700;color:#8a4b00;background:#fff1d6;border:1px solid #f5c26b;border-radius:4px;padding:0 4px;">★ WICHTIG</span> {% endif %}
+        {% if item.low_priority %}<span style="font-size:11px;font-weight:700;color:#5f5e5a;background:#eeede9;border:1px solid #d6d4ce;border-radius:4px;padding:0 4px;">↓ NIEDRIG</span> {% endif %}
+        <a href="{{ link }}" style="color:#1d1d1b;font-weight:600;font-size:15px;text-decoration:none;">{{ item.title }}</a>
+        <div style="font-size:13px;color:#6b6a66;margin-top:2px;">
+          {{ CATEGORY_SHORT[item.category] }}{% if item.authority %} · {{ item.authority }}{% endif %}
+          {% for s in item.sources %} · {{ SOURCE_LABELS[s.source] }}{% endfor %}
+        </div>
+        {% if item.deadline %}<div style="font-size:13px;margin-top:2px;">{{ item.deadline_label or 'Frist' }}: <strong>{{ item.deadline | dt }}</strong></div>{% endif %}
+        {% if item.keyword_matches or item.cpv_matches %}
+        <div style="font-size:12px;margin-top:4px;">
+          {% for code in item.cpv_matches %}<span style="background:#e8f0fb;color:#1f4f8f;border-radius:4px;padding:0 4px;font-family:Consolas,monospace;">{{ code }}</span> {% endfor %}
+          {% for k in item.keyword_matches %}<span style="background:{{ '#fff1d6' if k in item.priority_matches else '#e3f3ea' }};color:{{ '#8a4b00' if k in item.priority_matches else '#1f7a45' }};border-radius:4px;padding:0 4px;">{{ '★ ' if k in item.priority_matches }}{{ k }}</span> {% endfor %}
+        </div>
+        {% endif %}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endfor %}
+  {% if r.more %}<tr><td style="padding:2px 20px 8px;font-size:13px;color:#6b6a66;">… und {{ r.more }} weitere{% if base_url %} – <a href="{{ base_url }}/" style="color:#e8710a;">in der App ansehen</a>{% endif %}</td></tr>{% endif %}
+  {% endfor %}
+  <tr><td style="padding:16px 20px;font-size:12px;color:#6b6a66;border-top:1px solid #e2e0da;">
+    Automatische Nachricht des eV-Checkers.{% if base_url %} <a href="{{ base_url }}/einstellungen" style="color:#6b6a66;">E-Mail-Einstellungen</a>{% endif %}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

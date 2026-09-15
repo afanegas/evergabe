@@ -1,0 +1,416 @@
+<ContractAwardNotice xmlns="urn:oasis:names:specification:ubl:schema:xsd:ContractAwardNotice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ccts-cct="urn:un:unece:uncefact:data:specification:CoreComponentTypeSchemaModule:2" xmlns:efac="http://data.europa.eu/p27/eforms-ubl-extension-aggregate-components/1" xmlns:efbc="http://data.europa.eu/p27/eforms-ubl-extension-basic-components/1" xmlns:efext="http://data.europa.eu/p27/eforms-ubl-extensions/1" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2" xmlns:qdt="urn:oasis:names:specification:ubl:schema:xsd:QualifiedDataTypes-2" xmlns:udt="urn:oasis:names:specification:bdndr:schema:xsd:UnqualifiedDataTypes-1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<ext:UBLExtensions>
+		<ext:UBLExtension>
+			<ext:ExtensionContent>
+				<efext:EformsExtension>
+					<efac:ContractModification>
+						<efbc:ChangedNoticeIdentifier>5e211a11-2ae5-4e61-9b11-b5e8bea176a5-01</efbc:ChangedNoticeIdentifier>
+						<efbc:ModifiedContractIdentifier>CON-0001</efbc:ModifiedContractIdentifier>
+						<efac:Change>
+							<efbc:ChangeDescription languageID="DEU">NA 01 Im Rahmen der Werk- und Montageplanung wurden Änderungen an den elektrischen Schaltanlagen notwendig.  NA 02 Des Weiteren wurde im Bereich der Anlieferung eine Scherenhubbühne geplant, welche bisher nicht ausgeschrieben wurde</efbc:ChangeDescription>
+						</efac:Change>
+						<efac:ChangeReason>
+							<cbc:ReasonCode listName="modification-justification">add-wss</cbc:ReasonCode>
+							<efbc:ReasonDescription languageID="DEU">s. unter Punkt "Beschreibung der Änderungen"</efbc:ReasonDescription>
+						</efac:ChangeReason>
+					</efac:ContractModification>
+					<efac:NoticeResult>
+						<cbc:TotalAmount currencyID="EUR">2623638.42</cbc:TotalAmount>
+						<efac:LotResult>
+							<cbc:ID>RES-0001</cbc:ID>
+							<efac:LotTender>
+								<cbc:ID schemeName="tender">TEN-0001</cbc:ID>
+							</efac:LotTender>
+							<efac:SettledContract>
+								<cbc:ID schemeName="contract">CON-0001</cbc:ID>
+							</efac:SettledContract>
+							<efac:StrategicProcurement>
+								<efbc:ApplicableLegalBasis listName="cvd-scope">false</efbc:ApplicableLegalBasis>
+							</efac:StrategicProcurement>
+							<efac:StrategicProcurement>
+								<efbc:ApplicableLegalBasis listName="eed-scope">false</efbc:ApplicableLegalBasis>
+							</efac:StrategicProcurement>
+							<efac:TenderLot>
+								<cbc:ID schemeName="Lot">LOT-0001</cbc:ID>
+							</efac:TenderLot>
+						</efac:LotResult>
+						<efac:LotTender>
+							<cbc:ID schemeName="tender">TEN-0001</cbc:ID>
+							<cac:LegalMonetaryTotal>
+								<cbc:PayableAmount currencyID="EUR">2623638.42</cbc:PayableAmount>
+							</cac:LegalMonetaryTotal>
+							<efac:SubcontractingTerm>
+								<efbc:TermCode listName="applicability">not-known</efbc:TermCode>
+							</efac:SubcontractingTerm>
+							<efac:TenderingParty>
+								<cbc:ID schemeName="tenderingparty">TPA-0001</cbc:ID>
+							</efac:TenderingParty>
+							<efac:TenderLot>
+								<cbc:ID schemeName="Lot">LOT-0001</cbc:ID>
+							</efac:TenderLot>
+							<efac:TenderReference>
+								<cbc:ID>1</cbc:ID>
+							</efac:TenderReference>
+						</efac:LotTender>
+						<efac:SettledContract>
+							<cbc:ID schemeName="contract">CON-0001</cbc:ID>
+							<cbc:IssueDate>2025-09-16+02:00</cbc:IssueDate>
+							<cbc:Title languageID="DEU">Elektro Beckhoff GmbH, 33415 Verl</cbc:Title>
+							<efac:ContractReference>
+								<cbc:ID>1</cbc:ID>
+							</efac:ContractReference>
+							<efac:LotTender>
+								<cbc:ID>TEN-0001</cbc:ID>
+							</efac:LotTender>
+						</efac:SettledContract>
+						<efac:TenderingParty>
+							<cbc:ID schemeName="tendering-party">TPA-0001</cbc:ID>
+							<efac:Tenderer>
+								<cbc:ID schemeName="organization">ORG-0003</cbc:ID>
+							</efac:Tenderer>
+						</efac:TenderingParty>
+					</efac:NoticeResult>
+					<efac:NoticeSubType>
+						<cbc:SubTypeCode listName="notice-subtype">38</cbc:SubTypeCode>
+					</efac:NoticeSubType>
+					<efac:Organizations>
+						<efac:Organization>
+							<efac:Company>
+								<cbc:WebsiteURI>http://www.ahlen.de</cbc:WebsiteURI>
+								<cac:PartyIdentification>
+									<cbc:ID>ORG-0001</cbc:ID>
+								</cac:PartyIdentification>
+								<cac:PartyName>
+									<cbc:Name languageID="DEU">Stadt Ahlen</cbc:Name>
+								</cac:PartyName>
+								<cac:PostalAddress>
+									<cbc:StreetName>Westenmauer 10</cbc:StreetName>
+									<cbc:CityName>Ahlen</cbc:CityName>
+									<cbc:PostalZone>59227</cbc:PostalZone>
+									<cbc:CountrySubentityCode listName="nuts-lvl3">DEA38</cbc:CountrySubentityCode>
+									<cac:Country>
+										<cbc:IdentificationCode listName="country">DEU</cbc:IdentificationCode>
+									</cac:Country>
+								</cac:PostalAddress>
+								<cac:PartyLegalEntity>
+									<cbc:CompanyID>055700004004-31001-64</cbc:CompanyID>
+								</cac:PartyLegalEntity>
+								<cac:Contact>
+									<cbc:Name>Zentrale Vergabestelle</cbc:Name>
+									<cbc:Telephone>000</cbc:Telephone>
+									<cbc:ElectronicMail>zentrale-vergabestelle@stadt.ahlen.de</cbc:ElectronicMail>
+								</cac:Contact>
+							</efac:Company>
+						</efac:Organization>
+						<efac:Organization>
+							<efac:Company>
+								<cbc:WebsiteURI>https://www.bezreg-muenster.de/de/wirtschaft_finanzen_kommunalaufsicht/vergabekammer_westfalen/index.html</cbc:WebsiteURI>
+								<cac:PartyIdentification>
+									<cbc:ID>ORG-0002</cbc:ID>
+								</cac:PartyIdentification>
+								<cac:PartyName>
+									<cbc:Name languageID="DEU">Vergabekammer Westfalen</cbc:Name>
+								</cac:PartyName>
+								<cac:PostalAddress>
+									<cbc:StreetName>Albrecht-Thaer-Straße 9</cbc:StreetName>
+									<cbc:CityName>Münster</cbc:CityName>
+									<cbc:PostalZone>48147</cbc:PostalZone>
+									<cbc:CountrySubentityCode listName="nuts-lvl3">DEA33</cbc:CountrySubentityCode>
+									<cac:Country>
+										<cbc:IdentificationCode listName="country">DEU</cbc:IdentificationCode>
+									</cac:Country>
+								</cac:PostalAddress>
+								<cac:PartyLegalEntity>
+									<cbc:CompanyID>DE164242157</cbc:CompanyID>
+								</cac:PartyLegalEntity>
+								<cac:Contact>
+									<cbc:Telephone>000</cbc:Telephone>
+									<cbc:Telefax>+49 2514112165</cbc:Telefax>
+									<cbc:ElectronicMail>vergabekammer@bezreg-muenster.nrw.de</cbc:ElectronicMail>
+								</cac:Contact>
+							</efac:Company>
+						</efac:Organization>
+						<efac:Organization>
+							<efac:Company>
+								<cbc:WebsiteURI>http://www.elektro-beckhoff.de</cbc:WebsiteURI>
+								<cac:PartyIdentification>
+									<cbc:ID>ORG-0003</cbc:ID>
+								</cac:PartyIdentification>
+								<cac:PartyName>
+									<cbc:Name languageID="DEU">Elektro Beckhoff GmbH</cbc:Name>
+								</cac:PartyName>
+								<cac:PostalAddress>
+									<cbc:StreetName>Westweg 6</cbc:StreetName>
+									<cbc:CityName>Verl</cbc:CityName>
+									<cbc:PostalZone>33415</cbc:PostalZone>
+									<cbc:CountrySubentityCode listName="nuts-lvl3">DEA38</cbc:CountrySubentityCode>
+									<cac:Country>
+										<cbc:IdentificationCode listName="country">DEU</cbc:IdentificationCode>
+									</cac:Country>
+								</cac:PostalAddress>
+								<cac:PartyLegalEntity>
+									<cbc:CompanyID>HRB 7212 Gütersloh</cbc:CompanyID>
+								</cac:PartyLegalEntity>
+								<cac:Contact>
+									<cbc:Telephone>+49 52467007652</cbc:Telephone>
+									<cbc:Telefax>+49 524670078652</cbc:Telefax>
+									<cbc:ElectronicMail>kalkulation@elektro-beckhoff.de</cbc:ElectronicMail>
+								</cac:Contact>
+							</efac:Company>
+						</efac:Organization>
+					</efac:Organizations>
+				</efext:EformsExtension>
+			</ext:ExtensionContent>
+		</ext:UBLExtension>
+	</ext:UBLExtensions>
+	<cbc:UBLVersionID>2.3</cbc:UBLVersionID>
+	<cbc:CustomizationID>eforms-de-2.1</cbc:CustomizationID>
+	<cbc:ProfileID>eforms-sdk-1.13</cbc:ProfileID>
+	<cbc:ID schemeName="notice-id">91b90518-66d4-4b5d-9ed5-046f0c464e2a</cbc:ID>
+	<cbc:ContractFolderID>60b9eb90-575e-4e3c-b6f0-6db03de11592</cbc:ContractFolderID>
+	<cbc:IssueDate>2026-09-09+02:00</cbc:IssueDate>
+	<cbc:IssueTime>07:27:11+02:00</cbc:IssueTime>
+	<cbc:VersionID>01</cbc:VersionID>
+	<cbc:RequestedPublicationDate>2026-09-09+02:00</cbc:RequestedPublicationDate>
+	<cbc:RegulatoryDomain>32014L0024</cbc:RegulatoryDomain>
+	<cbc:NoticeTypeCode listName="cont-modif">can-modif</cbc:NoticeTypeCode>
+	<cbc:NoticeLanguageCode listID="eu-official-language">DEU</cbc:NoticeLanguageCode>
+	<cac:ContractingParty>
+		<cac:Party>
+			<cac:PartyIdentification>
+				<cbc:ID>ORG-0001</cbc:ID>
+			</cac:PartyIdentification>
+		</cac:Party>
+	</cac:ContractingParty>
+	<cac:TenderingTerms>
+		<ext:UBLExtensions>
+			<ext:UBLExtension>
+				<ext:ExtensionContent>
+					<efext:EformsExtension>
+						<efac:StrategicProcurement>
+							<efbc:ApplicableLegalBasis listName="cvd-scope">false</efbc:ApplicableLegalBasis>
+						</efac:StrategicProcurement>
+						<efac:StrategicProcurement>
+							<efbc:ApplicableLegalBasis listName="eed-scope">false</efbc:ApplicableLegalBasis>
+						</efac:StrategicProcurement>
+					</efext:EformsExtension>
+				</ext:ExtensionContent>
+			</ext:UBLExtension>
+		</ext:UBLExtensions>
+		<cbc:FundingProgramCode listName="eu-funded">no-eu-funds</cbc:FundingProgramCode>
+		<cac:ProcurementLegislationDocumentReference>
+			<cbc:ID>vob-a-eu</cbc:ID>
+		</cac:ProcurementLegislationDocumentReference>
+		<cac:AppealTerms>
+			<cac:PresentationPeriod>
+				<cbc:Description languageID="DEU">§ 160 GWB Einleitung, Antrag
+
+(1) Die Vergabekammer leitet ein Nachprüfungsverfahren nur auf Antrag ein.
+
+(2) Antragsbefugt ist jedes Unternehmen, das ein Interesse an dem öffentlichen Auftrag oder der Konzession hat und eine Verletzung in seinen Rechten nach § 97 Absatz 6 GWB durch Nichtbeachtung von Vergabevorschriften geltend macht. Dabei ist darzulegen, dass dem Unternehmen durch die behauptete Verletzung der Vergabevorschriften ein Schaden entstanden ist oder zu entstehen droht.
+
+(3) Der Antrag ist unzulässig, soweit
+1.  der Antragsteller den geltend gemachten Verstoß gegen Vergabevorschriften vor Einreichen des Nachprüfungsantrags erkannt und gegenüber dem Auftraggeber nicht innerhalb einer Frist von zehn Kalendertagen gerügt hat; der Ablauf der Frist nach § 134 Absatz 2  GWB bleibt unberührt, 
+2.  Verstöße gegen Vergabevorschriften, die aufgrund der Bekanntmachung erkennbar sind, nicht spätestens bis zum Ablauf der in der Bekanntmachung benannten Frist zur Bewerbung oder zur Angebotsabgabe gegenüber dem Auftraggeber gerügt werden, 
+3.  Verstöße gegen Vergabevorschriften, die erst in den Vergabeunterlagen erkennbar sind, nicht spätestens bis zum Ablauf der Frist zur Bewerbung oder zur Angebotsabgabe gegenüber dem Auftraggeber gerügt werden, 
+4.  mehr als 15 Kalendertage nach Eingang der Mitteilung des Auftraggebers, einer Rüge nicht abhelfen zu wollen, vergangen sind. 
+Satz 1 gilt nicht bei einem Antrag auf Feststellung der Unwirksamkeit des Vertrags nach § 135 Absatz 1 Nummer 2 GWB. § 134 Absatz 1 Satz 2 GWB bleibt unberührt.</cbc:Description>
+			</cac:PresentationPeriod>
+			<cac:AppealReceiverParty>
+				<cac:PartyIdentification>
+					<cbc:ID schemeName="organization">ORG-0002</cbc:ID>
+				</cac:PartyIdentification>
+			</cac:AppealReceiverParty>
+		</cac:AppealTerms>
+	</cac:TenderingTerms>
+	<cac:ProcurementProject>
+		<cbc:ID schemeName="internalID">2025-0126</cbc:ID>
+		<cbc:Name languageID="DEU">Auftragsänderung 1:  Bürgercampus Stadt Ahlen, Bürgerforum, Elektrotechnik</cbc:Name>
+		<cbc:Description languageID="DEU">Elektrotechnik</cbc:Description>
+		<cbc:ProcurementTypeCode listName="contract-nature">works</cbc:ProcurementTypeCode>
+		<cbc:Note languageID="DEU">#Bekanntmachungs-ID: CXPWYDALKYX#
+
+
+Kommunikation / Bieterfragen:
+
+Die Kommunikation zwischen Bietern und Auftraggeber erfolgt ausschließlich elektronisch über die Vergabeplattform Vergabemarktplatz NRW - Vergabe Westfalen. 
+Bieterfragen werden durch Bieterinformationen für alle Interessenten durch Veröffentlichung auf der Vergabeplattform beantwortet. 
+Am Vergabeverfahren interessierte Unternehmen sind gut beraten, sich regelmäßig auf der Vergabeplattform über neue Informationen zum Vergabeverfahren zu informieren. Als Service erhalten Interessenten, die sich für das Vergabeverfahren registriert haben, in der Regel eine E-Mail-Benachrichtigung über vorliegende Bieterinformationen.
+Zur Sendung von Anfragen bzw. Informationen an die Zentrale Vergabestelle durch ein interessiertes Unternehmen ist eine vorherige Anmeldung auf dem Vergabemarktplatz (www.vergabe-westfalen.de), erforderlich.
+Eine Registrierung / Anmeldung für das Vergabeverfahren wird aus den genannten Gründen ausdrücklich empfohlen. Sofern Sie sich nicht anmelden / registrieren, sind Sie selbst dazu angehalten, sich in regelmäßigen Abständen auf dem Vergabemarktplatz über Änderungen am bzw. Informationen zum Vergabeverfahren zu informieren.
+
+
+Angebot / Angebotsunterlagen / Angebotsabgabe:
+
+Das Angebot ist ausschließlich mittels und auf Grundlage der Vergabeunterlagen in der neuesten zur Verfügung gestellten Version zu erstellen.
+
+Möchten Sie zum ersten Mal ein elektronisches Angebot abgeben, empfehlen wir Ihnen, sich frühzeitig mit dem Vergabemarktplatz und dem Bietertool zu beschäftigen. Geben Sie Ihr Angebot ruhig zwei Tage vor Ablauf der Angebotsfrist ab. So bleibt bei etwaigen Problemen noch ausreichend Zeit, diese zu beheben.
+Ihr abgegebenes Angebot ist durch die Software des Bietertools / Vergabemarktplatzes verschlüsselt und auch für die Vergabestelle erst nach Ablauf der Angebotsfrist einsehbar.
+
+Hilfestellungen können Sie erhalten auf der Support-Seite der COSINEX GmbH unter: https://support.cosinex.de/unternehmen/
+
+Änderungen am Vergabeverfahren und den Vergabeunterlagen werden über den Vergabemarktplatz NRW bekannt gegeben.
+Sollten Sie die Bekanntmachung auf einem anderen Vergabeportal gelesen haben, informieren sie sich bitte auf dem Vergabemarktplatz NRW über etwaige Änderungen. Die Bekanntmachungen auf den anderen Vergabeportalen werden bei Änderungen nicht angepasst.
+
+
+Vertragsbestandteil:
+
+- Die Allgemeinen Vertragsbedingungen für die Ausführung von Bauleistungen (VOB/B),
+- die Allgemeinen Technischen Vertragsbedingungen für Bauleistungen (VOB/C) 
+werden Bestandteile des Vertrags. 
+
+Soweit die Vergabeunterlagen auch
+- Zusätzliche Vertragsbedingungen
+- Zusätzliche Technische Vertragsbedingungen
+- Besondere Vertragsbedingungen
+- Besondere Vertragsbedingungen zur Einhaltung des Tariftreue- und Vergabegesetzes Nordrhein Westfalen (BVB TVgG NRW)
+- oder sonstige - hier namentlich nicht näher genannte - Vertragsbedingungen
+enthalten, werden diese ebenfalls Bestandteile des Vertrages.
+
+
+Abwehrklausel:
+
+Allgemeine Geschäftsbedingungen, Liefer- oder Zahlungsbedingungen des Bieters werden nicht Vertragsbestandteil</cbc:Note>
+		<cac:MainCommodityClassification>
+			<cbc:ItemClassificationCode listName="cpv">45315100</cbc:ItemClassificationCode>
+		</cac:MainCommodityClassification>
+		<cac:RealizedLocation>
+			<cac:Address>
+				<cbc:StreetName>Westenmauer 10</cbc:StreetName>
+				<cbc:CityName>Ahlen</cbc:CityName>
+				<cbc:PostalZone>59227</cbc:PostalZone>
+				<cbc:CountrySubentityCode listName="nuts">DEA38</cbc:CountrySubentityCode>
+				<cac:Country>
+					<cbc:IdentificationCode listName="country">DEU</cbc:IdentificationCode>
+				</cac:Country>
+			</cac:Address>
+		</cac:RealizedLocation>
+	</cac:ProcurementProject>
+	<cac:ProcurementProjectLot>
+		<cbc:ID schemeName="Lot">LOT-0001</cbc:ID>
+		<cac:TenderingTerms>
+			<ext:UBLExtensions>
+				<ext:UBLExtension>
+					<ext:ExtensionContent>
+						<efext:EformsExtension>
+							<efac:StrategicProcurement>
+								<efbc:ApplicableLegalBasis listName="cvd-scope">false</efbc:ApplicableLegalBasis>
+							</efac:StrategicProcurement>
+							<efac:StrategicProcurement>
+								<efbc:ApplicableLegalBasis listName="eed-scope">false</efbc:ApplicableLegalBasis>
+							</efac:StrategicProcurement>
+						</efext:EformsExtension>
+					</ext:ExtensionContent>
+				</ext:UBLExtension>
+			</ext:UBLExtensions>
+			<cbc:FundingProgramCode listName="eu-funded">no-eu-funds</cbc:FundingProgramCode>
+			<cac:PaymentTerms>
+				<cbc:Note languageID="DEU">Bestimmungen der VOB/B</cbc:Note>
+			</cac:PaymentTerms>
+			<cac:TendererQualificationRequest>
+				<cbc:CompanyLegalFormCode listName="required">false</cbc:CompanyLegalFormCode>
+			</cac:TendererQualificationRequest>
+			<cac:ContractExecutionRequirement>
+				<cbc:ExecutionRequirementCode listName="conditions">performance</cbc:ExecutionRequirementCode>
+				<cbc:Description languageID="DEU">- Teilnahmebedingungen (212)
+- Besondere Vertragsbedingungen (214)
+- Objektbezogene Vertragsbedingungen
+- Zusätzliche Vertragsbedingungen (215)
+- Abfall (241)
+- Datenverarbeitung (244)
+- Besondere Vertragsbedingungen gem. Tariftreue- und Vergabegesetz Nordrhein-Westfalen - TVgG NRW (513)
+- Der Zuschlag kann nicht auf russische Staatsangehörige und russische Einrichtungen erteilt werden, soweit deren Beteiligung an öffentlichen Ausschreibungen gem. Verordnung (EU) 2022/576 verboten ist.</cbc:Description>
+			</cac:ContractExecutionRequirement>
+			<cac:AdditionalInformationParty>
+				<cac:PartyIdentification>
+					<cbc:ID>ORG-0001</cbc:ID>
+				</cac:PartyIdentification>
+			</cac:AdditionalInformationParty>
+			<cac:AppealTerms>
+				<cac:PresentationPeriod>
+					<cbc:Description languageID="DEU">§ 160 GWB Einleitung, Antrag
+
+(1) Die Vergabekammer leitet ein Nachprüfungsverfahren nur auf Antrag ein.
+
+(2) Antragsbefugt ist jedes Unternehmen, das ein Interesse an dem öffentlichen Auftrag oder der Konzession hat und eine Verletzung in seinen Rechten nach § 97 Absatz 6 GWB durch Nichtbeachtung von Vergabevorschriften geltend macht. Dabei ist darzulegen, dass dem Unternehmen durch die behauptete Verletzung der Vergabevorschriften ein Schaden entstanden ist oder zu entstehen droht.
+
+(3) Der Antrag ist unzulässig, soweit
+1.  der Antragsteller den geltend gemachten Verstoß gegen Vergabevorschriften vor Einreichen des Nachprüfungsantrags erkannt und gegenüber dem Auftraggeber nicht innerhalb einer Frist von zehn Kalendertagen gerügt hat; der Ablauf der Frist nach § 134 Absatz 2  GWB bleibt unberührt, 
+2.  Verstöße gegen Vergabevorschriften, die aufgrund der Bekanntmachung erkennbar sind, nicht spätestens bis zum Ablauf der in der Bekanntmachung benannten Frist zur Bewerbung oder zur Angebotsabgabe gegenüber dem Auftraggeber gerügt werden, 
+3.  Verstöße gegen Vergabevorschriften, die erst in den Vergabeunterlagen erkennbar sind, nicht spätestens bis zum Ablauf der Frist zur Bewerbung oder zur Angebotsabgabe gegenüber dem Auftraggeber gerügt werden, 
+4.  mehr als 15 Kalendertage nach Eingang der Mitteilung des Auftraggebers, einer Rüge nicht abhelfen zu wollen, vergangen sind. 
+Satz 1 gilt nicht bei einem Antrag auf Feststellung der Unwirksamkeit des Vertrags nach § 135 Absatz 1 Nummer 2 GWB. § 134 Absatz 1 Satz 2 GWB bleibt unberührt.</cbc:Description>
+				</cac:PresentationPeriod>
+				<cac:AppealReceiverParty>
+					<cac:PartyIdentification>
+						<cbc:ID schemeName="organization">ORG-0002</cbc:ID>
+					</cac:PartyIdentification>
+				</cac:AppealReceiverParty>
+			</cac:AppealTerms>
+			<cac:PostAwardProcess>
+				<cbc:ElectronicOrderUsageIndicator>false</cbc:ElectronicOrderUsageIndicator>
+				<cbc:ElectronicPaymentUsageIndicator>true</cbc:ElectronicPaymentUsageIndicator>
+			</cac:PostAwardProcess>
+		</cac:TenderingTerms>
+		<cac:TenderingProcess>
+			<cbc:GovernmentAgreementConstraintIndicator>true</cbc:GovernmentAgreementConstraintIndicator>
+			<cac:ContractingSystem>
+				<cbc:ContractingSystemTypeCode listName="framework-agreement">none</cbc:ContractingSystemTypeCode>
+			</cac:ContractingSystem>
+		</cac:TenderingProcess>
+		<cac:ProcurementProject>
+			<cbc:ID schemeName="internalID">2025-0126</cbc:ID>
+			<cbc:Name languageID="DEU">Auftragsänderung 1:  Bürgercampus Stadt Ahlen, Bürgerforum, Elektrotechnik</cbc:Name>
+			<cbc:Description languageID="DEU">1 St. Trafo 1600 kVA im Gebäude mit Mittelspannungsschaltanlage
+1 St. Gebäude NSHV mit Notstromeinspeisefeld
+13 St. Unterverteilungen im Gebäude mit KNX
+18.000 m NYM-J 3x2,5mm2
+14.000 m NYM-J 5x2,5mm2
+35.000 m Datenleitung
+1.000 m Kabeltrasse
+800 St. Betondosen in Ortbeton
+450 St. KNX Komponenten
+1.400 St. DALI Teilnehmer
+350 m Unterflurkanal
+400 St. Komponenten der Brandmeldeanlage
+200 St. Lautsprecher der Sprachalarmierungsanlage
+16 St. Fluchttürsteuerungen
+1St. Einbruchmeldetechnik mit 6 Scharfschaltbereichen
+7 St. Videokameras mit Aufzeichnung
+485 St. Sicherheitsleuchten mit Zentralbatteriegerät</cbc:Description>
+			<cbc:ProcurementTypeCode listName="contract-nature">works</cbc:ProcurementTypeCode>
+			<cac:ProcurementAdditionalType>
+				<cbc:ProcurementTypeCode listName="strategic-procurement">none</cbc:ProcurementTypeCode>
+			</cac:ProcurementAdditionalType>
+			<cac:MainCommodityClassification>
+				<cbc:ItemClassificationCode listName="cpv">45315100</cbc:ItemClassificationCode>
+			</cac:MainCommodityClassification>
+			<cac:RealizedLocation>
+				<cac:Address>
+					<cbc:StreetName>Westenmauer 10</cbc:StreetName>
+					<cbc:CityName>Ahlen</cbc:CityName>
+					<cbc:PostalZone>59227</cbc:PostalZone>
+					<cbc:CountrySubentityCode listName="nuts">DEA38</cbc:CountrySubentityCode>
+					<cac:Country>
+						<cbc:IdentificationCode listName="country">DEU</cbc:IdentificationCode>
+					</cac:Country>
+				</cac:Address>
+			</cac:RealizedLocation>
+			<cac:PlannedPeriod>
+				<cbc:StartDate>2025-10-27+01:00</cbc:StartDate>
+				<cbc:EndDate>2027-10-22+02:00</cbc:EndDate>
+			</cac:PlannedPeriod>
+			<cac:ContractExtension>
+				<cbc:MaximumNumberNumeric>1</cbc:MaximumNumberNumeric>
+				<cac:Renewal>
+					<cac:Period>
+						<cbc:Description languageID="DEU">Verlängerung bis zur Fertigstellung der ausgeschriebenen Leistung</cbc:Description>
+					</cac:Period>
+				</cac:Renewal>
+			</cac:ContractExtension>
+		</cac:ProcurementProject>
+	</cac:ProcurementProjectLot>
+	<cac:TenderResult>
+		<cbc:AwardDate>2000-01-01Z</cbc:AwardDate>
+	</cac:TenderResult>
+</ContractAwardNotice>

@@ -1,0 +1,30 @@
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>Vorinformationen zu Maßnahmen auf der Vergabeplattform des Landes Berlin</title>
+        <description>Die neusten Vorinformationen zu Maßnahmen der Vergabeplattform des Landes Berlin abonnieren (www.berlin.de/vergabeplattform)</description>
+        <language>de-de</language>
+        <link>https://www.berlin.de/vergabeplattform</link>
+        <pubDate>Sun, 13 Sep 2026 10:57:53</pubDate>
+                    <item>
+                <title>Bauunterhaltsmaßnahmen FM</title>
+                <description>Voraussichtliche Ausführungsfrist: 01.01.2028 - 31.12.2031</description>
+                <link>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/813</link>
+                <guid>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/813</guid>
+                <pubDate>Mon, 03 Aug 2026 10:57:53</pubDate>
+            </item>
+                    <item>
+                <title>Einkauf 2026</title>
+                <description>Voraussichtliche Ausführungsfrist: 01.10.2026 - 30.09.2027</description>
+                <link>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/821</link>
+                <guid>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/821</guid>
+                <pubDate>Tue, 18 Aug 2026 10:57:53</pubDate>
+            </item>
+                    <item>
+                <title>Mietgesuch Jobcenter Berlin Mitte</title>
+                <description>Voraussichtliche Ausführungsfrist: 13.09.2026 - 13.09.2026</description>
+                <link>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/826</link>
+                <guid>https://www.berlin.de/vergabeplattform/veroeffentlichungen/vorinformationen/826</guid>
+                <pubDate>Mon, 31 Aug 2026 10:57:53</pubDate>
+            </item>
+            </channel>
+</rss>

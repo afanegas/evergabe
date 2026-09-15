@@ -1,0 +1,81 @@
+{% macro status_badge(item) -%}
+  {% if item.status == 'interessant' %}
+    <span class="badge badge-yes">Interessant</span>
+  {% else %}
+    <span class="badge badge-no">Nicht interessant</span>
+  {% endif %}
+  {% if item.manual_status %}<span class="hint" title="Automatisch: {{ 'interessant' if item.auto_status == 'interessant' else 'nicht interessant' }}">manuell</span>{% endif %}
+{%- endmacro %}
+
+{% macro cpv_chip(item) -%}
+  {% set r = item.cpv_result %}
+  {% if r == 'treffer' %}
+    <span class="chip chip-hit" title="CPV-Treffer: {{ item.cpv_matches | join(', ') }}">CPV ✓</span>
+  {% elif r == 'kein_treffer' %}
+    <span class="chip chip-miss" title="CPV-Codes vorhanden, aber nicht auf der Liste">CPV ✗</span>
+  {% elif r == 'keine_codes' %}
+    <span class="chip chip-na" title="{% if item.detail_status in ('offen', 'fehler') %}Detailseite noch nicht geladen{% else %}Keine CPV-Codes vorhanden{% endif %}">CPV –</span>
+  {% else %}
+    <span class="chip chip-na" title="CPV-Prüfung ausgeschaltet">CPV aus</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro keyword_chip(item) -%}
+  {% set r = item.keyword_result %}
+  {% if r == 'treffer' %}
+    <span class="chip chip-hit" title="Stichwörter: {{ item.keyword_matches | join(', ') }}">Stichwort ✓</span>
+  {% elif r == 'ausgeschlossen' %}
+    <span class="chip chip-excluded" title="Stichwörter: {{ item.keyword_matches | join(', ') }} – ausgeschlossen durch: {{ item.exclusion_matches | join(', ') }}">Stichwort ⊘</span>
+  {% elif r == 'kein_treffer' %}
+    <span class="chip chip-miss" title="Kein Stichwort gefunden">Stichwort ✗</span>
+  {% else %}
+    <span class="chip chip-na" title="Stichwort-Prüfung ausgeschaltet">Stichwort aus</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro source_badges(item) -%}
+  {% for s in item.sources or [] %}
+    <span class="src src-{{ s.source }}" title="Quelle: {{ SOURCE_LABELS[s.source] }}">{{ SOURCE_LABELS[s.source] }}</span>
+  {% endfor %}
+{%- endmacro %}
+
+{% macro hits(item, cpv_labels) -%}
+  {% set excluded = item.keyword_result == 'ausgeschlossen' %}
+  {% set lowprio = item.lowprio_matches if item.status == 'interessant' else [] %}
+  {% if item.cpv_matches or item.keyword_matches or lowprio %}
+    <div class="hits">
+      {% for code in item.cpv_matches %}
+        {% set label = cpv_labels.get(code) %}
+        <span class="chip chip-cpv" title="CPV {{ code }}{% if label %} – {{ label }}{% endif %}">{{ code }}{% if label %} <span class="chip-label">{{ label }}</span>{% endif %}</span>
+      {% endfor %}
+      {% for k in item.keyword_matches %}
+        {% set important = k in item.priority_matches %}
+        <span class="chip {{ 'chip-priority' if important else 'chip-hit' }}{{ ' chip-struck' if excluded }}"
+              title="{{ 'Wichtiges Stichwort' if important else 'Stichwort' }}{{ ' – aufgehoben durch Ausschluss-Stichwort' if excluded }}">{{ '★ ' if important }}{{ k }}</span>
+      {% endfor %}
+      {% if excluded %}
+        {% for x in item.exclusion_matches %}<span class="chip chip-excluded" title="Ausschluss-Stichwort">⊘ {{ x }}</span>{% endfor %}
+      {% endif %}
+      {% for x in lowprio %}<span class="chip chip-low" title="Niedrig-Stichwort{{ '' if item.low_priority else ' – wichtiges Stichwort hat Vorrang' }}">↓ {{ x }}</span>{% endfor %}
+    </div>
+  {% else %}
+    <span class="muted">–</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro deadline(item) -%}
+  {% if item.deadline %}
+    {% set d = item.deadline | days_left %}
+    <div>{{ item.deadline | dt }}</div>
+    {% if d is not none %}
+      {% if d < 0 %}<small class="muted">abgelaufen</small>
+      {% elif d == 0 %}<small class="urgent">heute</small>
+      {% elif d <= 7 %}<small class="urgent">in {{ d }} Tag{{ 'en' if d != 1 }}</small>
+      {% else %}<small class="muted">in {{ d }} Tagen</small>{% endif %}
+    {% endif %}
+  {% elif item.execution_period %}
+    <small class="muted">Ausführung</small><div>{{ item.execution_period }}</div>
+  {% else %}
+    <span class="muted">–</span>
+  {% endif %}
+{%- endmacro %}

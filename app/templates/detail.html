@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, cpv_chip, keyword_chip, deadline, source_badges %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block page %}detail{% endblock %}
+{% block next_url %}/eintrag/{{ item.id }}{% endblock %}
+
+{% block content %}
+{% set self_url = '/eintrag/' ~ item.id ~ '?zurueck=' ~ (back_url | urlencode) %}
+<a class="back" href="{{ back_url }}">← zurück zur Liste</a>
+
+<div class="detail-head">
+  <div>
+    <div class="sub">
+      <span class="cat cat-{{ item.category }}">{{ CATEGORY_LABELS[item.category] }}</span>
+      <span class="cat">{{ REGION_LABELS[item.region] }}</span>
+      {{ source_badges(item) }}
+      {% if item.important %}<span class="pill-important">★ WICHTIG</span>{% endif %}
+      {% if item.low_priority %}<span class="pill-low">↓ NIEDRIG</span>{% endif %}
+      {% if was_new %}<span class="pill-new">NEU</span>{% endif %}
+    </div>
+    <h1>{{ item.title }}</h1>
+    {% if item.authority %}<div class="muted">{{ item.authority }}</div>{% endif %}
+  </div>
+  <div class="source-buttons">
+    {% for s in item.sources %}
+      {% if s.url %}
+        <a class="btn" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ SOURCE_LABELS[s.source] }} ↗</a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<div class="detail-grid">
+  <section class="card">
+    <h2>Einstufung</h2>
+    <p>{{ status_badge(item) }}</p>
+    <form method="post" action="/eintrag/{{ item.id }}/status" class="segmented">
+      <input type="hidden" name="next" value="{{ self_url }}">
+      <button name="status" value="auto" class="{% if not item.manual_status %}active{% endif %}">
+        Automatisch <small>({{ 'interessant' if item.auto_status == 'interessant' else 'nicht interessant' }})</small>
+      </button>
+      <button name="status" value="interessant" class="{% if item.manual_status == 'interessant' %}active{% endif %}">★ Interessant</button>
+      <button name="status" value="nicht_interessant" class="{% if item.manual_status == 'nicht_interessant' %}active{% endif %}">✕ Nicht interessant</button>
+    </form>
+
+    <h3>CPV-Prüfung {{ cpv_chip(item) }}</h3>
+    {% if item.cpv_codes %}
+      <ul class="cpv-list">
+        {% for c in item.cpv_codes %}
+          {% set hit = cpv_code_hit(c.code, item.cpv_matches) %}
+          <li class="{% if hit %}hit{% endif %}"><code>{{ c.code }}</code> {{ c.label }}{% if hit %} <span class="chip chip-hit">Liste: {{ hit | join(', ') }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    {% elif item.detail_status in ('offen', 'fehler') %}
+      <p class="muted">Detailseite noch nicht geladen{% if item.detail_error %} (Fehler: {{ item.detail_error }}){% endif %}.</p>
+    {% else %}
+      <p class="muted">Für diesen Eintrag gibt es keine CPV-Codes – bewertet wird nur über Stichwörter.</p>
+    {% endif %}
+
+    <h3>Stichwort-Prüfung {{ keyword_chip(item) }}</h3>
+    {% if item.keyword_matches %}
+      <p>Gefunden: {% for k in item.keyword_matches %}{% if k in item.priority_matches %}<span class="chip chip-priority" title="Wichtiges Stichwort">★ {{ k }}</span>{% else %}<span class="chip chip-hit">{{ k }}</span>{% endif %} {% endfor %}</p>
+    {% endif %}
+    {% if item.exclusion_matches %}
+      <p>Ausschluss: {% for k in item.exclusion_matches %}<span class="chip chip-excluded">{{ k }}</span> {% endfor %}</p>
+    {% endif %}
+    {% if not item.keyword_matches and not item.exclusion_matches %}
+      <p class="muted">Keine Stichwörter gefunden.</p>
+    {% endif %}
+    {% if item.lowprio_matches %}
+      <p>Niedrige Priorität: {% for k in item.lowprio_matches %}<span class="chip chip-low">↓ {{ k }}</span> {% endfor %}
+        {% if item.status != 'interessant' %}<small class="muted">(wirkt nur bei interessanten Einträgen)</small>
+        {% elif not item.low_priority %}<small class="muted">(wichtiges Stichwort hat Vorrang)</small>{% endif %}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Eckdaten</h2>
+    <dl class="facts">
+      {% if item.deadline %}<dt>{{ item.deadline_label or 'Frist' }}</dt><dd>{{ deadline(item) }}</dd>{% endif %}
+      {% if item.procedure %}<dt>Verfahren</dt><dd>{{ item.procedure }}</dd>{% endif %}
+      {% if item.location %}<dt>Ort</dt><dd>{{ item.location }}</dd>{% endif %}
+      {% if item.execution_period %}<dt>Ausführung</dt><dd>{{ item.execution_period }}</dd>{% endif %}
+      {% if item.contractor %}<dt>Beauftragtes Unternehmen</dt><dd>{{ item.contractor }}</dd>{% endif %}
+      {% if item.online_since %}<dt>Online seit</dt><dd>{{ item.online_since | dt }}</dd>{% endif %}
+      <dt>Zuerst gesehen</dt><dd>{{ item.first_seen | dt }}</dd>
+    </dl>
+  </section>
+</div>
+
+{% set text_terms = item.keyword_matches + item.exclusion_matches %}
+{% if item.subject or item.service_type or item.description or item.detail_fields.get('Maßnahme') %}
+<section class="card">
+  <h2>Beschreibung</h2>
+  {% if item.detail_fields.get('Maßnahme') %}<h3>Maßnahme</h3><p>{{ item.detail_fields['Maßnahme'] | highlight(text_terms) }}</p>{% endif %}
+  {% if item.subject %}<h3>Auftragsgegenstand</h3><p>{{ item.subject | highlight(text_terms) }}</p>{% endif %}
+  {% if item.service_type and item.service_type != item.subject %}<h3>Art der Leistung</h3><p>{{ item.service_type | highlight(text_terms) }}</p>{% endif %}
+  {% if item.description and item.description != item.detail_fields.get('Maßnahme') %}<h3>Kurzbeschreibung</h3><p>{{ item.description | highlight(text_terms) }}</p>{% endif %}
+</section>
+{% endif %}
+
+{% if item.documents %}
+<section class="card">
+  <h2>Dokumente</h2>
+  <ul>
+    {% for d in item.documents %}<li><a href="{{ d.url }}" target="_blank" rel="noopener noreferrer">{{ d.title or d.url }}</a></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Notiz</h2>
+  <form method="post" action="/eintrag/{{ item.id }}/notiz">
+    <input type="hidden" name="next" value="{{ self_url }}">
+    <textarea name="note" rows="3" placeholder="Eigene Notiz …">{{ item.note or '' }}</textarea>
+    <button class="btn" type="submit">Notiz speichern</button>
+  </form>
+</section>
+
+{% if extra_fields %}
+<details class="card">
+  <summary>Alle Angaben aus Feed und Detailseite</summary>
+  <dl class="facts">
+    {% for k, v in extra_fields.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+  </dl>
+</details>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% from "_macros.html" import status_badge, hits, deadline, source_badges %}
+{% set cpv_labels = cpv_rule_labels() %}
+{% set group_url = current_url ~ '#gruppe-' ~ g.key %}
+{% if g["items"] %}
+<div class="table-wrap">
+<table class="tenders">
+  <thead>
+    <tr>
+      <th>Titel</th>
+      <th>Frist</th>
+      <th>Online seit</th>
+      <th>Treffer</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in g["items"] %}
+    <tr class="{% if not item.seen_at %}is-new{% endif %} {% if item.status == 'interessant' %}is-yes{% endif %} {% if item.important %}is-important{% endif %} {% if item.low_priority %}is-low{% endif %}">
+      <td class="title-cell">
+        <div class="title-line">
+          {% if item.important %}<span class="pill-important" title="Wichtiges Stichwort: {{ item.priority_matches | join(', ') }}">★ WICHTIG</span>{% endif %}
+          {% if item.low_priority %}<span class="pill-low" title="Niedrig-Stichwort: {{ item.lowprio_matches | join(', ') }}">↓ NIEDRIG</span>{% endif %}
+          {% if not item.seen_at %}<span class="pill-new">NEU</span>{% endif %}
+          <a href="/eintrag/{{ item.id }}?zurueck={{ group_url | urlencode }}">{{ item.title }}</a>
+        </div>
+        <div class="sub">
+          <span class="cat cat-{{ item.category }}">{{ CATEGORY_SHORT[item.category] }}</span>
+          {{ source_badges(item) }}
+          {% if item.authority %}<span>{{ item.authority }}</span>{% endif %}
+          {% if item.procedure %}<span class="muted">{{ item.procedure }}</span>{% endif %}
+          {% if item.contractor %}<span>→ {{ item.contractor }}</span>{% endif %}
+        </div>
+      </td>
+      <td class="nowrap">{{ deadline(item) }}</td>
+      <td class="nowrap">{{ (item.online_since or item.published_at) | dt(false) }}</td>
+      <td class="hits-cell">{{ hits(item, cpv_labels) }}</td>
+      <td class="status-cell">
+        <div>{{ status_badge(item) }}</div>
+        <form method="post" action="/eintrag/{{ item.id }}/status" class="inline">
+          <input type="hidden" name="next" value="{{ group_url }}">
+          {% if item.status == 'interessant' %}
+            <button class="btn btn-sm btn-ghost" name="status" value="nicht_interessant" title="Als nicht interessant markieren">✕ nicht interessant</button>
+          {% else %}
+            <button class="btn btn-sm btn-ghost" name="status" value="interessant" title="Als interessant markieren">★ interessant</button>
+          {% endif %}
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if g.total > g["items"] | length %}
+  <div class="group-more">
+    <span class="muted">{{ g["items"] | length }} von {{ g.total }}</span>
+    <a class="btn btn-ghost btn-sm" href="{{ g.more_url }}">weitere anzeigen</a>
+  </div>
+{% endif %}
+{% else %}
+  <div class="group-empty muted">Keine Einträge für diese Auswahl.</div>
+{% endif %}

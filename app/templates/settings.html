@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block page %}settings{% endblock %}
+{% block next_url %}/einstellungen{% endblock %}
+
+{% macro rule_row(kind, index, e) -%}
+  {% set prefix = 'rule-' ~ kind ~ '-' ~ index %}
+  <li class="rule-row{% if not e.active %} is-inactive{% endif %}">
+    <label class="rule-toggle">
+      <input type="checkbox" name="{{ prefix }}-active" value="1" {% if e.active %}checked{% endif %}>
+      <span class="rule-value">{% if kind == 'cpv' %}<code>{{ e.value }}</code>{% else %}{{ e.value }}{% endif %}</span>
+      {% if kind == 'cpv' and e.label %}<span class="rule-label muted">{{ e.label }}</span>{% endif %}
+    </label>
+    <input type="hidden" name="{{ prefix }}-value" value="{{ e.value }}">
+    {% if kind == 'cpv' %}<input type="hidden" name="{{ prefix }}-label" value="{{ e.label or '' }}">{% endif %}
+    <button type="button" class="rule-delete" title="Löschen" aria-label="{{ e.value }} löschen">×</button>
+  </li>
+{%- endmacro %}
+
+{% block content %}
+<h1>Einstellungen</h1>
+
+{% if errors %}
+  <div class="banner banner-error">
+    <strong>Nicht gespeichert:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+<section class="card">
+  <h2>Klassifizierung</h2>
+  <p class="muted">
+    Jeder Eintrag wird mit zwei getrennten Prüfungen bewertet. Einträge ohne CPV-Codes
+    (z. B. vergebene Aufträge, Vorinformationen) werden nur über Stichwörter bewertet.
+    Beim Speichern werden alle Einträge neu klassifiziert. Manuelle Einstufungen bleiben erhalten.
+  </p>
+
+  <form method="post" action="/einstellungen/klassifizierung">
+    <div class="options">
+      <label class="check"><input type="checkbox" name="cpv_enabled" value="1" {% if values.cpv_enabled %}checked{% endif %}> <strong>CPV-Prüfung</strong> aktiv</label>
+      <label class="check"><input type="checkbox" name="keyword_enabled" value="1" {% if values.keyword_enabled %}checked{% endif %}> <strong>Stichwort-Prüfung</strong> aktiv</label>
+      <fieldset class="radio-group">
+        <legend>Interessant, wenn …</legend>
+        <label class="check"><input type="radio" name="combine" value="oder" {% if values.combine != 'und' %}checked{% endif %}> <strong>ODER</strong> – eine der Prüfungen trifft</label>
+        <label class="check"><input type="radio" name="combine" value="und" {% if values.combine == 'und' %}checked{% endif %}> <strong>UND</strong> – beide Prüfungen treffen</label>
+      </fieldset>
+    </div>
+
+    {% set panels = [
+      ('cpv', 'CPV-Codes', 'Oberbegriffe decken Unterbegriffe ab (71314000 trifft auch 71314300).'),
+      ('priority', '★ Wichtige Stichwörter', 'Zählen wie normale Stichwörter. Treffer werden als „wichtig“ markiert und stehen in jeder Gruppe oben.'),
+      ('keyword', 'Stichwörter', 'Groß-/Kleinschreibung egal, Wortteile zählen („Klimaschutz“ trifft „Klimaschutzkonzept“). Bis 3 Zeichen oder in "Anführungszeichen" nur als ganzes Wort. * ist ein Platzhalter, auch über einen Bindestrich oder ein Leerzeichen hinweg: Energie*spar*contracting trifft „Energiespar-Contracting“ und „Energieeinsparcontracting“. Gilt für alle Stichwort-Listen.'),
+      ('exclusion', 'Ausschluss-Stichwörter', 'Kommt eines davon vor, zählt die Stichwort-Prüfung nicht als Treffer.'),
+      ('lowprio', '↓ Niedrige Priorität', 'Gilt nur für interessante Einträge und ändert nichts an der Einstufung: Sie werden als „niedrig“ markiert und stehen in ihrer Gruppe unten.'),
+    ] %}
+    <div class="rule-grid">
+      {% for kind, title, hint in panels %}
+      {% set entries = rules[kind] %}
+      <div class="rule-panel rule-panel-{{ kind }}" data-kind="{{ kind }}" data-next="{{ entries | length }}">
+        <div class="rule-panel-head">
+          <strong>{{ title }}</strong>
+          <span class="rule-count muted">{{ entries | selectattr('active') | list | length }} von {{ entries | length }} aktiv</span>
+        </div>
+        <small class="muted">{{ hint }}</small>
+        {% if kind == 'lowprio' %}
+          <div class="rule-options">
+            <fieldset class="radio-group">
+              <legend>Prüfen in …</legend>
+              <label class="check"><input type="radio" name="lowprio_scope" value="titel" {% if values.lowprio_scope != 'alles' %}checked{% endif %}> nur Titel</label>
+              <label class="check"><input type="radio" name="lowprio_scope" value="alles" {% if values.lowprio_scope == 'alles' %}checked{% endif %}> Titel und Beschreibung</label>
+            </fieldset>
+            <label class="rule-conflict">
+              <span class="muted">Trifft zugleich ein ★ wichtiges Stichwort:</span>
+              <select name="priority_conflict">
+                <option value="wichtig" {% if values.priority_conflict not in ('niedrig', 'beide') %}selected{% endif %}>★ Wichtig gewinnt (oben)</option>
+                <option value="niedrig" {% if values.priority_conflict == 'niedrig' %}selected{% endif %}>↓ Niedrig gewinnt (unten)</option>
+                <option value="beide" {% if values.priority_conflict == 'beide' %}selected{% endif %}>Beides markieren (Mitte)</option>
+              </select>
+            </label>
+          </div>
+        {% endif %}
+        <div class="rule-bulk">
+          <button type="button" class="btn btn-ghost btn-sm" data-bulk="on">alle an</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-bulk="off">alle aus</button>
+        </div>
+        <ul class="rule-list">
+          {% for e in entries %}
+            {{ rule_row(kind, loop.index0, e) }}
+          {% endfor %}
+        </ul>
+        <div class="rule-add">
+          {% if kind == 'cpv' %}
+            <input type="text" class="rule-add-value narrow-code" placeholder="71314000" inputmode="numeric" aria-label="Neuer CPV-Code">
+            <input type="text" class="rule-add-label" placeholder="Bezeichnung (optional)" aria-label="Bezeichnung">
+          {% else %}
+            <input type="text" class="rule-add-value" placeholder="Neues Stichwort" aria-label="Neues Stichwort">
+          {% endif %}
+          <button type="button" class="btn btn-sm rule-add-button">+ Hinzufügen</button>
+        </div>
+        <div class="rule-add-error urgent" hidden></div>
+        <template class="rule-template">{{ rule_row(kind, '__INDEX__', {'value': '', 'label': '', 'active': True}) }}</template>
+      </div>
+      {% endfor %}
+    </div>
+
+    <input type="hidden" name="rules_form" value="1">
+    <div class="save-bar" {% if not rules_dirty %}hidden{% endif %}>
+      <span>Ungespeicherte Änderungen</span>
+      <a class="btn btn-ghost btn-sm" href="/einstellungen">Verwerfen</a>
+      <button class="btn btn-primary" type="submit">Speichern &amp; neu klassifizieren</button>
+    </div>
+    <button class="btn btn-primary" type="submit">Speichern &amp; neu klassifizieren</button>
+  </form>
+</section>
+
+<section class="card" id="feeds">
+  <h2>Feeds</h2>
+  <p class="muted">
+    Quellen, die beim Abruf geladen werden. Abgeschaltete Feeds werden nicht mehr abgerufen, bereits geladene
+    Einträge bleiben in der Liste. oeffentlichevergabe.de liefert Tagesexporte immer erst für den Vortag.
+    Einträge, die in beiden Quellen stehen (gleicher Titel und gleiche Vergabestelle in Berlin), werden zusammengeführt.
+    Nicht interessante Einträge aus „Rest“ werden nach {{ retention_days }} Tagen gelöscht, außer sie haben eine
+    manuelle Einstufung oder eine Notiz. Neue Quellen brauchen eine eigene Anbindung im Code.
+  </p>
+  <form method="post" action="/einstellungen/feeds">
+    <div class="table-wrap">
+    <table class="runs feeds">
+      <thead><tr><th>Aktiv</th><th>Feed</th><th>Gespeichert</th><th>Letzter Abruf</th></tr></thead>
+      <tbody>
+      {% for f in feeds %}
+        {% if loop.first or f.group != loop.previtem.group %}
+          <tr class="feed-group"><td colspan="4"><strong>{{ f.group }}</strong></td></tr>
+        {% endif %}
+        <tr>
+          <td><input type="checkbox" name="feed_{{ f.feed.key }}" value="1" id="feed_{{ f.feed.key }}" {% if f.enabled %}checked{% endif %}></td>
+          <td>
+            <label for="feed_{{ f.feed.key }}"><strong>{{ f.feed.label }}</strong></label><br>
+            <a class="muted small-link" href="{{ f.feed.url }}" target="_blank" rel="noopener noreferrer">{{ f.feed.url }}</a>
+          </td>
+          <td class="nowrap">{{ f.stored }} Einträge</td>
+          <td>
+            {% if not f.enabled %}
+              <span class="muted">abgeschaltet</span>
+            {% elif f.status %}
+              {% if f.status.error %}
+                <span class="urgent">Fehler{% if f.status.failures and f.status.failures > 1 %} ({{ f.status.failures }}× hintereinander){% endif %}</span> · {{ f.status.at | dt }}
+                <br><small class="muted">{{ f.status.error }}</small>
+              {% else %}
+                <span class="nowrap">{{ f.status.at | dt }}</span><br>
+                {% if f.status.day %}
+                  <small class="muted">geladen bis {{ f.status.day | dt(false) }} · {{ f.status['items'] }} Bekanntmachungen, {{ f.status.new }} neu, {{ f.status.merged }} zusammengeführt</small>
+                {% else %}
+                  <small class="muted">{{ f.status['items'] }} im Feed, {{ f.status.new }} neu</small>
+                {% endif %}
+              {% endif %}
+            {% else %}
+              <span class="muted">noch nicht abgerufen</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <button class="btn btn-primary" type="submit" style="margin-top: 0.75rem">Feeds speichern</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Aktualisierung</h2>
+  <form method="post" action="/einstellungen/zeitplan" class="schedule">
+    <label class="check">
+      <input type="radio" name="schedule_mode" value="zeiten" {% if values.schedule_mode != 'intervall' %}checked{% endif %}>
+      Feste Uhrzeiten
+    </label>
+    <input type="text" name="times_text" value="{{ times_text }}" placeholder="07:00, 13:00">
+
+    <label class="check">
+      <input type="radio" name="schedule_mode" value="intervall" {% if values.schedule_mode == 'intervall' %}checked{% endif %}>
+      Alle
+    </label>
+    <span><input type="number" name="schedule_interval_hours" min="1" max="168" value="{{ values.schedule_interval_hours }}" class="narrow"> Stunden</span>
+
+    <button class="btn btn-primary" type="submit">Zeitplan speichern</button>
+  </form>
+
+  {% if gap_warning %}<div class="banner banner-warn">{{ gap_warning }}</div>{% endif %}
+
+  <p class="muted">
+    {% if next_runs %}
+      Nächste Abrufe: {% for r in next_runs[:3] %}{{ r.strftime('%d.%m.%Y %H:%M') }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% else %}
+      Kein Zeitplan aktiv.
+    {% endif %}
+    · Die App muss laufen, damit abgerufen wird. Verpasste Abrufe werden beim nächsten Start nachgeholt.
+  </p>
+</section>
+
+<section class="card" id="mail">
+  <h2>Tägliche E-Mail</h2>
+  <p class="muted">
+    Einmal am Tag eine Mail mit den seit der letzten Mail neu hinzugekommenen interessanten Treffern
+    (★ wichtige zuerst, nach Region). Gibt es keine neuen Treffer, wird nichts verschickt.
+  </p>
+  {% if smtp_summary %}
+    <p><small class="muted">SMTP (aus der .env): {{ smtp_summary }}</small></p>
+  {% else %}
+    <div class="banner banner-warn">
+      SMTP ist nicht konfiguriert – bitte <code>EVC_SMTP_HOST</code>, <code>EVC_SMTP_FROM</code> und ggf. Benutzer/Passwort in der
+      <code>.env</code> eintragen und den Container neu starten.
+    </div>
+  {% endif %}
+  {% if not base_url %}
+    <p><small class="muted">Hinweis: <code>EVC_BASE_URL</code> ist nicht gesetzt – Links in der Mail führen dann direkt zur Originalbekanntmachung.</small></p>
+  {% endif %}
+  <form method="post" action="/einstellungen/mail" class="mail-form">
+    <label class="check"><input type="checkbox" name="mail_enabled" value="1" {% if values.mail_enabled %}checked{% endif %}> <strong>Tägliche E-Mail</strong> aktiv</label>
+    <label>Empfänger <small class="muted">(mehrere durch Komma trennen)</small>
+      <input type="text" name="mail_to" value="{{ values.mail_to }}" placeholder="name@example.org" autocomplete="email">
+    </label>
+    <label>Uhrzeit
+      <input type="text" name="mail_time" value="{{ values.mail_time }}" class="narrow" placeholder="07:30">
+    </label>
+    <div class="mail-actions">
+      <button class="btn btn-primary" type="submit">E-Mail-Einstellungen speichern</button>
+      <button class="btn" type="submit" formaction="/einstellungen/mail/test" {% if not smtp_summary or not values.mail_to %}disabled title="SMTP und Empfänger nötig"{% endif %}>Test-Mail senden</button>
+    </div>
+  </form>
+  <p class="muted">
+    {% if values.mail_enabled and mail_next_run %}Nächste Mail: {{ mail_next_run.strftime('%d.%m.%Y %H:%M') }}. {% endif %}
+    {% set check = values.mail_last_check %}
+    {% if check %}
+      Letzter Versand{{ ' (Test)' if check.test }}: {{ check.at | dt }} –
+      {% if check.sent %}verschickt, {{ check.count }} Treffer{% elif check.error %}<span class="urgent">fehlgeschlagen: {{ check.error }}</span>{% else %}nichts Neues, keine Mail{% endif %}
+    {% endif %}
+  </p>
+</section>
+
+<section class="card" id="backup">
+  <h2>Datensicherung</h2>
+  <p class="muted">
+    Jede Nacht um {{ backup_next_run.strftime('%H:%M') if backup_next_run else '03:00' }} Uhr legt die App eine Kopie der Datenbank in
+    <code>data/backups</code> ab und behält die letzten {{ backup_keep }}. Für ein vollständiges Backup genügt es, den Ordner
+    <code>data</code> des Servers zu sichern.
+  </p>
+  {% if backups %}
+  <div class="table-wrap">
+  <table class="runs">
+    <thead><tr><th>Datei</th><th>Erstellt</th><th>Größe</th></tr></thead>
+    <tbody>
+    {% for b in backups[:5] %}
+      <tr><td><code>{{ b.name }}</code></td><td class="nowrap">{{ b.created | dt }}</td><td class="nowrap">{{ (b.size / 1048576) | round(1) }} MB</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if backups | length > 5 %}<p><small class="muted">… und {{ backups | length - 5 }} ältere</small></p>{% endif %}
+  {% else %}
+    <p class="muted">Noch keine Sicherung vorhanden.</p>
+  {% endif %}
+  <form method="post" action="/einstellungen/backup" style="margin-top: 0.75rem">
+    <button class="btn" type="submit">Jetzt sichern</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Abrufprotokoll</h2>
+  {% if runs %}
+  <div class="table-wrap">
+  <table class="runs">
+    <thead><tr><th>Start</th><th>Auslöser</th><th>Dauer</th><th>Neu</th><th>Detailseiten</th><th>Fehler</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr>
+        <td class="nowrap">{{ r.started_at | dt }}</td>
+        <td>{{ r.trigger }}</td>
+        <td>{% if r.finished_at %}{{ run_duration(r) }}{% else %}läuft …{% endif %}</td>
+        <td>{{ r.new_items }}</td>
+        <td>{{ r.details_fetched }}</td>
+        <td>
+          {% if r.errors %}
+            <details><summary class="urgent">{{ r.errors | length }}</summary><ul>{% for e in r.errors %}<li><small>{{ e }}</small></li>{% endfor %}</ul></details>
+          {% else %}–{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+    <p class="muted">Noch keine Abrufe.</p>
+  {% endif %}
+</section>
+{% endblock %}

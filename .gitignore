@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Daten, Datensicherungen und persönliche Einstellungen – nie ins Repository
+data/
+.env
+.env.*
+!.env.example
+
+# lokale Werkzeug-Einstellungen
+.claude/
