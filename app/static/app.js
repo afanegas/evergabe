@@ -135,6 +135,10 @@
       const m = value.match(/^(\d{8})(?:-\d)?$/);
       if (!m) { showError(panel, "CPV-Code: 8 Ziffern, z. B. 71314000"); valueInput.focus(); return; }
       value = m[1];
+    } else {
+      // kombinierte Stichwörter einheitlich schreiben: „Konzept+Energie“ -> „Konzept + Energie“
+      value = value.split("+").map(function (part) { return part.trim(); }).filter(Boolean).join(" + ");
+      if (!/[\p{L}\p{N}]/u.test(value)) { showError(panel, "Das Stichwort enthält keine Buchstaben."); return; }
     }
     if (existingValues(panel).indexOf(value.toLowerCase()) !== -1) {
       showError(panel, "„" + value + "“ ist schon in der Liste.");
@@ -163,6 +167,9 @@
       }
     } else {
       shown.textContent = value;
+      const addScope = panel.querySelector(".rule-add-scope");
+      const rowScope = row.querySelector(".rule-scope");
+      if (addScope && rowScope) rowScope.value = addScope.value;
     }
     row.querySelector(".rule-delete").setAttribute("aria-label", value + " löschen");
     row.classList.add("is-new-rule");
@@ -202,7 +209,7 @@
       if (event.target.matches(".rule-list input[type=checkbox]")) {
         updateCount(panel);
         markDirty();
-      } else if (event.target.closest(".rule-options")) {
+      } else if (event.target.closest(".rule-options") || event.target.matches(".rule-list .rule-scope")) {
         markDirty();
       }
     });

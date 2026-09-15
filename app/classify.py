@@ -42,7 +42,8 @@ class Rules:
     exclusions: list[str] = field(default_factory=list)
     priority_keywords: list[str] = field(default_factory=list)
     lowprio_keywords: list[str] = field(default_factory=list)
-    lowprio_scope: str = "titel"  # titel | alles
+    # Stichwort-Listen: Strings oder (Wert, Bereich "alles"|"titel") – siehe match_terms
+    lowprio_scope: str = "titel"  # Standardbereich für Niedrig-Stichwörter ohne eigenen Bereich
     priority_conflict: str = "wichtig"  # wichtig | niedrig | beide
     cpv_enabled: bool = True
     keyword_enabled: bool = True
@@ -112,16 +113,41 @@ def _any_term_pattern(terms: tuple[str, ...]) -> re.Pattern | None:
     return re.compile("|".join(f"(?:{p})" for p in patterns), re.IGNORECASE)
 
 
-def match_terms(text: str, terms: list[str]) -> list[str]:
+SCOPE_ALL = "alles"  # Titel und Beschreibung
+SCOPE_TITLE = "titel"  # nur Titel
+
+
+def term_parts(term: str) -> list[str]:
+    """Kombiniertes Stichwort: Teile mit + verbunden ("Konzept + Energie") – alle Teile müssen vorkommen."""
+    return [part.strip() for part in term.split("+") if part.strip()]
+
+
+@lru_cache(maxsize=4096)
+def term_patterns(term: str) -> tuple[re.Pattern, ...]:
+    patterns = tuple(keyword_pattern(part) for part in term_parts(term))
+    return patterns if patterns and all(patterns) else ()
+
+
+def _normalize_terms(terms, default_scope: str) -> list[tuple[str, str]]:
+    """Stichwörter als (Wert, Bereich); einfache Strings gelten für den Standardbereich."""
+    return [(t, default_scope) if isinstance(t, str) else (t[0], t[1] or default_scope) for t in terms]
+
+
+def match_terms(text: str, terms, title: str | None = None, default_scope: str = SCOPE_ALL) -> list[str]:
+    """Getroffene Stichwörter (in Reihenfolge der Liste). Bereich "titel" prüft nur `title`."""
+    normalized = _normalize_terms(terms, default_scope)
+    if not normalized:
+        return []
     # Vorprüfung mit einem gemeinsamen Ausdruck: die meisten Texte enthalten gar kein Stichwort
-    combined = _any_term_pattern(tuple(terms))
-    if combined is None or not combined.search(text):
+    combined = _any_term_pattern(tuple(part for value, _ in normalized for part in term_parts(value)))
+    if combined is None or not combined.search(f"{text}\n{title or ''}"):
         return []
     hits = []
-    for term in terms:
-        pattern = keyword_pattern(term)
-        if pattern and pattern.search(text):
-            hits.append(term)
+    for value, scope in normalized:
+        target = (title or "") if scope == SCOPE_TITLE else text
+        patterns = term_patterns(value)
+        if patterns and all(p.search(target) for p in patterns):
+            hits.append(value)
     return hits
 
 
@@ -158,10 +184,12 @@ def classify(
     if not rules.keyword_enabled:
         keyword = AUS
     else:
-        priority_matches = match_terms(text, rules.priority_keywords)
+        priority_matches = match_terms(text, rules.priority_keywords, title)
         seen = {m.lower() for m in priority_matches}
-        keyword_matches = priority_matches + [m for m in match_terms(text, rules.keywords) if m.lower() not in seen]
-        exclusion_matches = match_terms(text, rules.exclusions)
+        keyword_matches = priority_matches + [
+            m for m in match_terms(text, rules.keywords, title) if m.lower() not in seen
+        ]
+        exclusion_matches = match_terms(text, rules.exclusions, title)
         if keyword_matches and exclusion_matches:
             keyword = AUSGESCHLOSSEN
         else:
@@ -177,8 +205,7 @@ def classify(
 
     status = INTERESSANT if interesting else NICHT_INTERESSANT
     # Niedrige Priorität nur für interessante Einträge (eine manuelle Einstufung hat Vorrang)
-    lowprio_text = (title or "") if rules.lowprio_scope == "titel" else text
-    lowprio_matches = match_terms(lowprio_text, rules.lowprio_keywords)
+    lowprio_matches = match_terms(text, rules.lowprio_keywords, title, default_scope=rules.lowprio_scope)
     is_interesting = (manual_status or status) == INTERESSANT
     important, low, level = resolve_priority(
         keyword == TREFFER and bool(priority_matches), is_interesting and bool(lowprio_matches), rules.priority_conflict

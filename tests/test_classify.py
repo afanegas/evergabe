@@ -164,3 +164,29 @@ def test_conflict_between_important_and_low_priority(conflict, expected):
                                   priority_conflict=conflict), title=title)
     assert (r.important, r.low_priority, r.level) == expected
     assert r.lowprio_matches == ["Planungsleistungen"]  # Hinweis bleibt auch, wenn wichtig gewinnt
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Erstellung eines Konzepts zur Energieversorgung", True),
+    ("Energiekonzept für die Grundschule", True),  # Wortteile zählen, Reihenfolge egal
+    ("Konzept für den Schulhof", False),  # nur ein Teil
+    ("Energieausweis", False),
+])
+def test_combined_keyword_requires_all_parts(text, expected):
+    assert bool(match_terms(text, ["Konzept + Energie"])) is expected
+
+
+def test_combined_keyword_with_wildcard_and_short_part():
+    assert match_terms("PV-Anlage mit Speicherkonzept", ["PV + Speicher*konzept"]) == ["PV + Speicher*konzept"]
+    assert match_terms("PVC-Boden, Speicherkonzept", ["PV + Speicher*konzept"]) == []  # PV nur als ganzes Wort
+    assert match_terms("irgendwas", ["+"]) == []
+
+
+def test_scope_per_keyword():
+    title = "Neubau Grundschule"
+    text = f"{title}\nInklusive Energiekonzept und Photovoltaik"
+    terms = [("Energiekonzept", "titel"), ("Photovoltaik", "alles")]
+    assert match_terms(text, terms, title) == ["Photovoltaik"]
+    assert match_terms(text, [("Neubau + Energiekonzept", "titel")], title) == []  # alle Teile im Titel nötig
+    r = classify(text, [], rules(keywords=terms, exclusions=[("Photovoltaik", "titel")]), title=title)
+    assert (r.keyword, r.keyword_matches) == (TREFFER, ["Photovoltaik"])  # Ausschluss nur im Titel greift nicht

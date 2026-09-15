@@ -98,6 +98,11 @@ Stand: 13.09.2026 (Phase 1 fertig)
 - [x] Warnung (Banner auf allen Seiten), wenn eine aktive Quelle 2× oder öfter hintereinander nicht abgerufen werden konnte – mit Anzahl, „seit“ und letzter Fehlermeldung; verschwindet nach erfolgreichem Abruf
 - [x] Die 6 Contracting-Schreibweisen in den ★ wichtigen Stichwörtern durch `Energie*spar*contracting` ersetzt (auch in der Start-Liste für neue Installationen)
 
+### Kombinierte Stichwörter & Bereich je Stichwort ✅ (15.09.2026)
+- [x] Kombinierte Stichwörter mit `+` („Konzept + Energie“): alle Teile müssen im gewählten Bereich vorkommen, Reihenfolge egal; kombinierbar mit `*`
+- [x] Bereich je Stichwort (alle Stichwort-Listen): Titel + Beschreibung oder nur Titel; gemeinsame Einstellung „Prüfen in“ bei ↓ Niedrig entfällt (Wert wurde auf die Niedrig-Stichwörter übertragen)
+- [x] „Energiemanagementsystem“ als Stichwort und ★ wichtiges Stichwort (einmalige Ergänzung auch in bestehenden Datenbanken)
+
 ### Vorschläge (14.09.2026, noch nicht umgesetzt)
 - [ ] Treffer-Statistik je Regel (Treffer in 30 Tagen, davon manuell als nicht interessant markiert)
 - [ ] Vorschau vor dem Speichern der Regeln („+12 interessant, −3 niedrig“)

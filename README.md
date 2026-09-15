@@ -128,6 +128,13 @@ Einträge ohne CPV-Codes (Vergebene Aufträge, Vorinformationen) werden nur übe
 Stichwörter mit bis zu 3 Zeichen (z. B. `PV`) oder in Anführungszeichen zählen nur als ganzes Wort.
 `*` ist ein Platzhalter für beliebige Buchstaben, auch über einen Bindestrich oder ein Leerzeichen hinweg
 (`Energie*spar*contracting` trifft „Energiespar-Contracting“, „Energieeinspar Contracting“ usw.).
+Mit `+` verbundene Begriffe müssen alle vorkommen, egal wo und in welcher Reihenfolge (`Konzept + Energie`).
+Für jedes Stichwort ist wählbar, ob im Titel und in der Beschreibung oder nur im Titel gesucht wird
+(Standard: Titel + Beschreibung, bei ↓ Niedrig nur Titel).
+
+Regeln und Einstellungen liegen in der Datenbank (`data/ev-checker.db`), nicht im Code: Updates (`git pull`, neues Image)
+überschreiben sie nicht. Die Start-Regeln werden nur beim allerersten Start angelegt; nachträglich ergänzte Standard-Regeln
+(z. B. „Energiemanagementsystem“) kommen einmalig hinzu und bleiben gelöscht, wenn man sie entfernt.
 
 Kann eine aktive Quelle 2× oder öfter hintereinander nicht abgerufen werden, zeigt jede Seite oben eine Warnung.
 

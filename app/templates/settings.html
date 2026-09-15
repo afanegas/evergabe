@@ -3,6 +3,13 @@
 {% block page %}settings{% endblock %}
 {% block next_url %}/einstellungen{% endblock %}
 
+{% macro scope_select(name, scope, css='rule-scope') -%}
+  <select {% if name %}name="{{ name }}"{% endif %} class="{{ css }}" title="Wo wird gesucht?" aria-label="Suchbereich">
+    <option value="alles" {% if scope != 'titel' %}selected{% endif %}>Titel + Beschreibung</option>
+    <option value="titel" {% if scope == 'titel' %}selected{% endif %}>nur Titel</option>
+  </select>
+{%- endmacro %}
+
 {% macro rule_row(kind, index, e) -%}
   {% set prefix = 'rule-' ~ kind ~ '-' ~ index %}
   <li class="rule-row{% if not e.active %} is-inactive{% endif %}">
@@ -12,7 +19,11 @@
       {% if kind == 'cpv' and e.label %}<span class="rule-label muted">{{ e.label }}</span>{% endif %}
     </label>
     <input type="hidden" name="{{ prefix }}-value" value="{{ e.value }}">
-    {% if kind == 'cpv' %}<input type="hidden" name="{{ prefix }}-label" value="{{ e.label or '' }}">{% endif %}
+    {% if kind == 'cpv' %}
+      <input type="hidden" name="{{ prefix }}-label" value="{{ e.label or '' }}">
+    {% else %}
+      {{ scope_select(prefix ~ '-scope', e.scope or ('titel' if kind == 'lowprio' else 'alles')) }}
+    {% endif %}
     <button type="button" class="rule-delete" title="Löschen" aria-label="{{ e.value }} löschen">×</button>
   </li>
 {%- endmacro %}
@@ -49,7 +60,7 @@
     {% set panels = [
       ('cpv', 'CPV-Codes', 'Oberbegriffe decken Unterbegriffe ab (71314000 trifft auch 71314300).'),
       ('priority', '★ Wichtige Stichwörter', 'Zählen wie normale Stichwörter. Treffer werden als „wichtig“ markiert und stehen in jeder Gruppe oben.'),
-      ('keyword', 'Stichwörter', 'Groß-/Kleinschreibung egal, Wortteile zählen („Klimaschutz“ trifft „Klimaschutzkonzept“). Bis 3 Zeichen oder in "Anführungszeichen" nur als ganzes Wort. * ist ein Platzhalter, auch über einen Bindestrich oder ein Leerzeichen hinweg: Energie*spar*contracting trifft „Energiespar-Contracting“ und „Energieeinsparcontracting“. Gilt für alle Stichwort-Listen.'),
+      ('keyword', 'Stichwörter', 'Groß-/Kleinschreibung egal, Wortteile zählen („Klimaschutz“ trifft „Klimaschutzkonzept“). Bis 3 Zeichen oder in "Anführungszeichen" nur als ganzes Wort. * ist ein Platzhalter, auch über einen Bindestrich oder ein Leerzeichen hinweg: Energie*spar*contracting trifft „Energiespar-Contracting“ und „Energieeinsparcontracting“. Mit + verbundene Begriffe müssen alle vorkommen: Konzept + Energie. Je Stichwort wählbar: in Titel + Beschreibung oder nur im Titel suchen. Gilt für alle Stichwort-Listen.'),
       ('exclusion', 'Ausschluss-Stichwörter', 'Kommt eines davon vor, zählt die Stichwort-Prüfung nicht als Treffer.'),
       ('lowprio', '↓ Niedrige Priorität', 'Gilt nur für interessante Einträge und ändert nichts an der Einstufung: Sie werden als „niedrig“ markiert und stehen in ihrer Gruppe unten.'),
     ] %}
@@ -64,11 +75,6 @@
         <small class="muted">{{ hint }}</small>
         {% if kind == 'lowprio' %}
           <div class="rule-options">
-            <fieldset class="radio-group">
-              <legend>Prüfen in …</legend>
-              <label class="check"><input type="radio" name="lowprio_scope" value="titel" {% if values.lowprio_scope != 'alles' %}checked{% endif %}> nur Titel</label>
-              <label class="check"><input type="radio" name="lowprio_scope" value="alles" {% if values.lowprio_scope == 'alles' %}checked{% endif %}> Titel und Beschreibung</label>
-            </fieldset>
             <label class="rule-conflict">
               <span class="muted">Trifft zugleich ein ★ wichtiges Stichwort:</span>
               <select name="priority_conflict">
@@ -93,7 +99,8 @@
             <input type="text" class="rule-add-value narrow-code" placeholder="71314000" inputmode="numeric" aria-label="Neuer CPV-Code">
             <input type="text" class="rule-add-label" placeholder="Bezeichnung (optional)" aria-label="Bezeichnung">
           {% else %}
-            <input type="text" class="rule-add-value" placeholder="Neues Stichwort" aria-label="Neues Stichwort">
+            <input type="text" class="rule-add-value" placeholder="Neues Stichwort, z. B. Konzept + Energie" aria-label="Neues Stichwort">
+            {{ scope_select('', 'titel' if kind == 'lowprio' else 'alles', 'rule-add-scope') }}
           {% endif %}
           <button type="button" class="btn btn-sm rule-add-button">+ Hinzufügen</button>
         </div>

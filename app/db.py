@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS rules (
     value TEXT NOT NULL,
     label TEXT,
     active INTEGER NOT NULL DEFAULT 1,   -- abgeschaltete Regeln bleiben gespeichert, wirken aber nicht
+    scope TEXT NOT NULL DEFAULT 'alles', -- Stichwörter: alles (Titel + Beschreibung) | titel
     UNIQUE(kind, value)
 );
 
@@ -130,8 +131,11 @@ def init_db() -> None:
 def _migrate_columns(conn) -> None:
     """Spalten nachrüsten, die in älteren Datenbanken fehlen."""
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'rules'").fetchone():
-        if "active" not in {row["name"] for row in conn.execute("PRAGMA table_info(rules)")}:
+        rule_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rules)")}
+        if "active" not in rule_columns:
             conn.execute("ALTER TABLE rules ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+        if "scope" not in rule_columns:
+            conn.execute("ALTER TABLE rules ADD COLUMN scope TEXT NOT NULL DEFAULT 'alles'")
     exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tenders'").fetchone()
     if not exists:
         return

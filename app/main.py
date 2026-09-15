@@ -24,6 +24,8 @@ async def lifespan(app: FastAPI):
     settings.seed_rules()
     seeded = settings.seed_priority_rules()
     seeded = settings.seed_lowprio_rules() or seeded
+    seeded = settings.migrate_rule_scopes() or seeded
+    seeded = settings.apply_rule_additions() or seeded
     if seeded:
         fetcher.reclassify_all()  # bestehende Einträge mit neu angelegten Stichwort-Listen markieren
     if config.SCHEDULER_ENABLED:
@@ -49,6 +51,8 @@ async def reject_cross_site_posts(request: Request, call_next):
         if origin and origin != "null" and origin.split("://", 1)[-1] != host:
             return HTMLResponse("Anfrage von fremder Seite abgelehnt", status_code=403)
     return await call_next(request)
+
+
 templates = Jinja2Templates(directory=config.BASE_DIR / "templates")
 
 
@@ -82,7 +86,7 @@ def days_left(value: str | None) -> int | None:
 def highlight(text: str | None, terms: list[str]) -> Markup:
     if not text:
         return Markup("")
-    patterns = [p.pattern for p in (classify.keyword_pattern(t) for t in terms) if p]
+    patterns = [p.pattern for t in terms for p in classify.term_patterns(t)]
     escaped = str(escape(text))
     if not patterns:
         return Markup(escaped.replace("\n", "<br>"))
@@ -384,7 +388,6 @@ async def save_classification(request: Request):
         "cpv_enabled": cpv_enabled,
         "keyword_enabled": keyword_enabled,
         "combine": "und" if form.get("combine") == "und" else "oder",
-        "lowprio_scope": "alles" if form.get("lowprio_scope") == "alles" else "titel",
         "priority_conflict": form.get("priority_conflict") if form.get("priority_conflict") in ("niedrig", "beide") else "wichtig",
     })
     settings.replace_rules(rules)

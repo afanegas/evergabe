@@ -16,14 +16,14 @@ DEFAULTS = {
     "schedule_interval_hours": 12,
     "feeds_disabled": [],  # Schlüssel abgeschalteter Feeds (neue Feeds sind automatisch aktiv)
     "feed_status": {},  # je Feed: Zeitpunkt, Einträge im Feed, davon neu, Fehler des letzten Abrufs
-    "ov_last_day": None,
-    "lowprio_scope": "titel",  # Niedrig-Stichwörter prüfen: titel | alles
+    "ov_last_day": None,  # zuletzt vollständig geladener Tag von oeffentlichevergabe.de (JJJJ-MM-TT)
+    "lowprio_scope": "titel",  # veraltet: früherer gemeinsamer Bereich der Niedrig-Stichwörter (nur für Migration)
     "priority_conflict": "wichtig",  # wichtig + niedrig zugleich: wichtig | niedrig | beide
     "mail_enabled": False,  # tägliche E-Mail mit neuen interessanten Treffern
     "mail_to": "",  # Empfänger, durch Komma getrennt
     "mail_time": "07:30",
     "mail_last_sent_at": None,  # Zeitpunkt der letzten verschickten Mail (neue Treffer seitdem)
-    "mail_last_check": None,  # Ergebnis des letzten Versandversuchs  # zuletzt vollständig geladener Tag von oeffentlichevergabe.de (JJJJ-MM-TT)
+    "mail_last_check": None,  # Ergebnis des letzten Versandversuchs
 }
 
 START_CPV = [
@@ -119,13 +119,53 @@ def seed_lowprio_rules() -> bool:
     if get("lowprio_seeded"):
         return False
     with connect() as conn:
-        conn.executemany("INSERT OR IGNORE INTO rules(kind, value) VALUES('lowprio', ?)", [(k,) for k in START_LOWPRIO])
+        conn.executemany(
+            "INSERT OR IGNORE INTO rules(kind, value, scope) VALUES('lowprio', ?, 'titel')", [(k,) for k in START_LOWPRIO]
+        )
     set_many({"lowprio_seeded": True})
     return True
 
 
+def migrate_rule_scopes() -> bool:
+    """Einmalig: Früher galt ein gemeinsamer Bereich für alle Niedrig-Stichwörter (Einstellung lowprio_scope).
+    Jetzt hat jedes Stichwort einen eigenen Bereich – der alte Wert wird auf die Niedrig-Stichwörter übertragen."""
+    if get("rule_scopes_migrated"):
+        return False
+    scope = "alles" if get("lowprio_scope") == "alles" else "titel"
+    with connect() as conn:
+        conn.execute("UPDATE rules SET scope = ? WHERE kind = 'lowprio'", (scope,))
+    set_many({"rule_scopes_migrated": True})
+    return True
+
+
+# Nachträglich ergänzte Regeln: werden in bestehenden Datenbanken einmalig hinzugefügt (je Kennung nur einmal,
+# damit ein später gelöschter Eintrag nicht wiederkommt). Neue Installationen bekommen sie ebenfalls.
+RULE_ADDITIONS = [
+    ("add-energiemanagementsystem", [("keyword", "Energiemanagementsystem"), ("priority", "Energiemanagementsystem")]),
+]
+
+
+def apply_rule_additions() -> bool:
+    done = set(get("rule_additions_done") or [])
+    changed = False
+    for key, entries in RULE_ADDITIONS:
+        if key in done:
+            continue
+        with connect() as conn:
+            for kind, value in entries:
+                exists = conn.execute(
+                    "SELECT 1 FROM rules WHERE kind = ? AND lower(value) = lower(?)", (kind, value)
+                ).fetchone()
+                if not exists:
+                    conn.execute("INSERT INTO rules(kind, value) VALUES(?, ?)", (kind, value))
+                    changed = True
+        done.add(key)
+    set_many({"rule_additions_done": sorted(done)})
+    return changed
+
+
 def list_rules(kind: str, only_active: bool = False) -> list[dict]:
-    query = "SELECT value, label, active FROM rules WHERE kind = ?" + (" AND active = 1" if only_active else "")
+    query = "SELECT value, label, active, scope FROM rules WHERE kind = ?" + (" AND active = 1" if only_active else "")
     with connect() as conn:
         return [dict(r) for r in conn.execute(query + " ORDER BY id", (kind,))]
 
@@ -139,16 +179,21 @@ def load_rules() -> Rules:
     values = get_all()
     return Rules(
         cpv_codes=[r["value"] for r in list_rules("cpv", only_active=True)],
-        keywords=[r["value"] for r in list_rules("keyword", only_active=True)],
-        exclusions=[r["value"] for r in list_rules("exclusion", only_active=True)],
-        priority_keywords=[r["value"] for r in list_rules("priority", only_active=True)],
-        lowprio_keywords=[r["value"] for r in list_rules("lowprio", only_active=True)],
+        keywords=[(r["value"], r["scope"]) for r in list_rules("keyword", only_active=True)],
+        exclusions=[(r["value"], r["scope"]) for r in list_rules("exclusion", only_active=True)],
+        priority_keywords=[(r["value"], r["scope"]) for r in list_rules("priority", only_active=True)],
+        lowprio_keywords=[(r["value"], r["scope"]) for r in list_rules("lowprio", only_active=True)],
         lowprio_scope=values["lowprio_scope"],
         priority_conflict=values["priority_conflict"],
         cpv_enabled=bool(values["cpv_enabled"]),
         keyword_enabled=bool(values["keyword_enabled"]),
         combine=values["combine"],
     )
+
+
+def default_scope(kind: str) -> str:
+    """Bereich für neue Stichwörter: Niedrig-Stichwörter nur im Titel, alle anderen in Titel und Beschreibung."""
+    return "titel" if kind == "lowprio" else "alles"
 
 
 def normalize_cpv(value: str) -> str | None:
@@ -160,7 +205,7 @@ def normalize_cpv(value: str) -> str | None:
 def parse_rules_form(form) -> tuple[dict[str, list[dict]], list[str]]:
     """Regel-Listen aus dem Einstellungsformular lesen.
 
-    Jede Zeile hat die Felder rule-<art>-<nr>-value, -label (nur CPV) und -active (Checkbox).
+    Jede Zeile hat die Felder rule-<art>-<nr>-value, -label (nur CPV), -scope (nur Stichwörter) und -active.
     Gelöschte Zeilen fehlen im Formular. Doppelte Einträge (ohne Groß-/Kleinschreibung) werden zusammengefasst.
     """
     rows: dict[str, list[tuple[int, dict]]] = {kind: [] for kind in RULE_KINDS}
@@ -173,12 +218,21 @@ def parse_rules_form(form) -> tuple[dict[str, list[dict]], list[str]]:
         prefix = f"rule-{kind}-{index}"
         value = (form.get(key) or "").strip()
         label = (form.get(f"{prefix}-label") or "").strip()
-        entry = {"value": value, "label": label if kind == "cpv" else None, "active": bool(form.get(f"{prefix}-active"))}
+        scope = form.get(f"{prefix}-scope")
+        if kind == "cpv":
+            scope = "alles"
+        elif scope not in ("alles", "titel"):
+            scope = default_scope(kind)
+        entry = {"value": value, "label": label if kind == "cpv" else None, "active": bool(form.get(f"{prefix}-active")),
+                 "scope": scope}
         if not value:
             continue
-        if kind != "cpv" and not value.replace("*", "").replace('"', "").strip():
-            errors.append(f"Ungültiges Stichwort „{value}“ (nur Platzhalter)")
-            continue
+        if kind != "cpv":
+            value = " + ".join(part.strip() for part in value.split("+") if part.strip())  # „A+B“ -> „A + B“
+            entry["value"] = value
+            if not any(ch.isalnum() for ch in value):
+                errors.append(f"Ungültiges Stichwort „{value}“ (enthält keine Buchstaben)")
+                continue
         if kind == "cpv":
             code = normalize_cpv(value)
             if code is None:
@@ -204,8 +258,12 @@ def replace_rules(rules: dict[str, list[dict]]) -> None:
         for kind, entries in rules.items():
             conn.execute("DELETE FROM rules WHERE kind = ?", (kind,))
             conn.executemany(
-                "INSERT INTO rules(kind, value, label, active) VALUES(?, ?, ?, ?)",
-                [(kind, e["value"], e.get("label") or None, int(e.get("active", True))) for e in entries],
+                "INSERT INTO rules(kind, value, label, active, scope) VALUES(?, ?, ?, ?, ?)",
+                [
+                    (kind, e["value"], e.get("label") or None, int(e.get("active", True)),
+                     e.get("scope") or default_scope(kind))
+                    for e in entries
+                ],
             )
 
 

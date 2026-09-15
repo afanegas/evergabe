@@ -259,6 +259,8 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
 .rule-toggle input { align-self: center; flex-shrink: 0; }
 .rule-value { overflow-wrap: anywhere; }
 .rule-label { font-size: 0.82rem; overflow-wrap: anywhere; }
+.rule-scope, .rule-add-scope { font-size: 0.78rem; padding: 0.15rem 0.3rem; flex-shrink: 0; max-width: 11rem; }
+.rule-row.is-inactive .rule-scope { opacity: 0.6; }
 .rule-delete {
   border: none; background: transparent; color: var(--muted); font-size: 1.15rem; line-height: 1;
   width: 1.7rem; height: 1.7rem; border-radius: 4px; cursor: pointer; flex-shrink: 0;

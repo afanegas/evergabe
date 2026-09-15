@@ -13,15 +13,18 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def rules_form(cpv=(), keyword=(), priority=(), exclusion=(), lowprio=(), inactive=(), **options) -> dict:
-    """Formulardaten wie von der Einstellungsseite: je Regel eine Zeile mit Wert, (Bezeichnung) und Checkbox."""
+    """Formulardaten wie von der Einstellungsseite: je Regel eine Zeile mit Wert, Checkbox und
+    (CPV) Bezeichnung bzw. (Stichwort) Bereich. Tupel: (Code, Bezeichnung) oder (Stichwort, Bereich)."""
     data = {"rules_form": "1", "combine": "oder", "keyword_enabled": "1", **options}
     for kind, entries in (("cpv", cpv), ("keyword", keyword), ("priority", priority), ("exclusion", exclusion),
                           ("lowprio", lowprio)):
         for i, entry in enumerate(entries):
-            value, label = entry if isinstance(entry, tuple) else (entry, "")
+            value, extra = entry if isinstance(entry, tuple) else (entry, "")
             data[f"rule-{kind}-{i}-value"] = value
             if kind == "cpv":
-                data[f"rule-{kind}-{i}-label"] = label
+                data[f"rule-{kind}-{i}-label"] = extra
+            elif extra:
+                data[f"rule-{kind}-{i}-scope"] = extra
             if value not in inactive:
                 data[f"rule-{kind}-{i}-active"] = "1"
     return data
@@ -189,7 +192,7 @@ def test_rules_can_be_deactivated_added_and_deleted(client):
                 data=rules_form(keyword=["Tischlerarbeiten", "Maler- und Lackierarbeiten"], inactive=["Maler- und Lackierarbeiten"]))
     keywords = settings.list_rules("keyword")
     assert [(r["value"], r["active"]) for r in keywords] == [("Tischlerarbeiten", 1), ("Maler- und Lackierarbeiten", 0)]
-    assert settings.load_rules().keywords == ["Tischlerarbeiten"]  # abgeschaltete wirken nicht
+    assert settings.load_rules().keywords == [("Tischlerarbeiten", "alles")]  # abgeschaltete wirken nicht
     with connect() as conn:
         maler = conn.execute("SELECT auto_status FROM tenders WHERE title = 'Maler- und Lackierarbeiten'").fetchall()
     assert maler and all(r["auto_status"] == "nicht_interessant" for r in maler)
@@ -208,7 +211,7 @@ def test_rules_can_be_deactivated_added_and_deleted(client):
                       "rule-cpv-1000-value": "45421000-4", "rule-cpv-1000-label": "Bautischlerarbeiten",
                       "rule-cpv-1000-active": "1", "cpv_enabled": "1"})
     assert [r["value"] for r in settings.list_rules("keyword")] == ["Tischlerarbeiten", "Glasfaser"]
-    assert settings.list_rules("cpv") == [{"value": "45421000", "label": "Bautischlerarbeiten", "active": 1}]
+    assert settings.list_rules("cpv") == [{"value": "45421000", "label": "Bautischlerarbeiten", "active": 1, "scope": "alles"}]
 
 
 def test_invalid_rules_keep_entered_values(client):
@@ -223,10 +226,9 @@ def test_low_priority_entries_are_at_the_bottom_and_marked(client):
     assert [r["value"] for r in settings.list_rules("lowprio")] == ["Planungsleistungen", "HOAI"]  # Start-Liste
 
     client.post("/einstellungen/klassifizierung", data=rules_form(
-        keyword=["arbeiten"], priority=["Tischlerarbeiten"], lowprio=["Tischler", "Maler"],
-        lowprio_scope="titel", priority_conflict="beide"))
-    values = settings.get_all()
-    assert (values["lowprio_scope"], values["priority_conflict"]) == ("titel", "beide")
+        keyword=["arbeiten"], priority=["Tischlerarbeiten"], lowprio=["Tischler", "Maler"], priority_conflict="beide"))
+    assert settings.get_all()["priority_conflict"] == "beide"
+    assert {r["scope"] for r in settings.list_rules("lowprio")} == {"titel"}  # Standard für Niedrig: nur Titel
 
     html = client.get("/?status=interessant").text
     group = html.split('id="gruppe-berlin-ausschreibungen"')[1].split("</details>")[0]
@@ -257,7 +259,7 @@ def test_low_priority_entries_are_at_the_bottom_and_marked(client):
 def test_wildcard_keywords_can_be_saved(client):
     from app import settings
     response = client.post("/einstellungen/klassifizierung", data=rules_form(keyword=["Glas*ausbau"], priority=["*"]))
-    assert "Nicht gespeichert" in response.text and "nur Platzhalter" in response.text
+    assert "Nicht gespeichert" in response.text and "enthält keine Buchstaben" in response.text
     client.post("/einstellungen/klassifizierung", data=rules_form(keyword=["Glas*ausbau"]))
     assert [r["value"] for r in settings.list_rules("keyword")] == ["Glas*ausbau"]
     with connect() as conn:
@@ -296,3 +298,47 @@ def test_warning_after_repeated_source_failures(client, monkeypatch):
     assert "nicht erreichbar" in client.get("/").text
     client.post("/einstellungen/feeds", data={"feed_bekanntmachung": "1"})  # Vorinformationen abgeschaltet
     assert "nicht erreichbar" not in client.get("/").text
+
+
+def test_combined_keywords_and_scope_are_saved_and_applied(client):
+    from app import settings
+    client.post("/einstellungen/klassifizierung", data=rules_form(
+        keyword=[("Glasfaser+Signallieferung", "titel"), ("Schädlingsbekämpfung", "alles")],
+        lowprio=[("Rahmenvertrag", "alles")]))
+    rules = {r["value"]: r["scope"] for r in settings.list_rules("keyword")}
+    assert rules == {"Glasfaser + Signallieferung": "titel", "Schädlingsbekämpfung": "alles"}  # „+“ vereinheitlicht
+    assert settings.list_rules("lowprio")[0]["scope"] == "alles"
+    with connect() as conn:
+        row = conn.execute("SELECT auto_status, keyword_matches FROM tenders WHERE title = 'Glasfaserausbau und Signallieferung'").fetchone()
+    assert row["auto_status"] == "interessant" and "Glasfaser + Signallieferung" in row["keyword_matches"]
+
+    html = client.get("/einstellungen").text
+    assert '<option value="titel" selected>nur Titel</option>' in html
+    response = client.post("/einstellungen/klassifizierung", data=rules_form(keyword=["+ *"]))
+    assert "enthält keine Buchstaben" in response.text
+
+
+def test_rule_migrations_on_start(tmp_path, monkeypatch):
+    """Bestehende Datenbank: gemeinsamer Niedrig-Bereich wird übernommen, Energiemanagementsystem ergänzt – je nur einmal."""
+    from app import settings
+    from app.db import init_db
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "old.db")
+    monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    init_db()
+    settings.seed_rules()
+    settings.seed_priority_rules()
+    settings.seed_lowprio_rules()
+    settings.set_many({"lowprio_scope": "alles"})  # alte gemeinsame Einstellung
+
+    with TestClient(main.app):
+        pass
+    assert {r["scope"] for r in settings.list_rules("lowprio")} == {"alles"}
+    assert "Energiemanagementsystem" in [r["value"] for r in settings.list_rules("keyword")]
+    assert "Energiemanagementsystem" in [r["value"] for r in settings.list_rules("priority")]
+
+    # gelöschter Eintrag kommt beim nächsten Start nicht wieder
+    settings.replace_rules({"priority": [r for r in settings.list_rules("priority") if r["value"] != "Energiemanagementsystem"]})
+    with TestClient(main.app):
+        pass
+    assert "Energiemanagementsystem" not in [r["value"] for r in settings.list_rules("priority")]
