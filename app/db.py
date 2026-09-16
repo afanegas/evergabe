@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS tenders (
     lowprio_matches TEXT NOT NULL DEFAULT '[]',
     low_priority INTEGER NOT NULL DEFAULT 0,   -- als niedrige Priorität markiert
     priority_level INTEGER NOT NULL DEFAULT 0,   -- Sortierung in der Gruppe: 2 wichtig, 1 beides, 0 normal, -1 niedrig
+    favorite INTEGER NOT NULL DEFAULT 0,   -- Auftraggeber wird beobachtet
+    authority_matches TEXT NOT NULL DEFAULT '[]',   -- getroffene Auftraggeber-Muster
     manual_status TEXT,
     note TEXT,
     first_seen TEXT NOT NULL,
@@ -68,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_sources_tender ON tender_sources(tender_id);
 
 CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY,
-    kind TEXT NOT NULL,          -- cpv | keyword | priority | lowprio | exclusion
+    kind TEXT NOT NULL,          -- cpv | keyword | priority | lowprio | exclusion | authority
     value TEXT NOT NULL,
     label TEXT,
     active INTEGER NOT NULL DEFAULT 1,   -- abgeschaltete Regeln bleiben gespeichert, wirken aber nicht
@@ -120,6 +122,7 @@ def init_db() -> None:
         conn.executescript(
             """
             CREATE INDEX IF NOT EXISTS idx_tenders_region_category ON tenders(region, category);
+            CREATE INDEX IF NOT EXISTS idx_tenders_favorite ON tenders(favorite);
             -- Einträge aus der Zeit vor der Quellen-Tabelle stammen alle aus dem Berlin-Feed
             INSERT OR IGNORE INTO tender_sources(tender_id, source, uid, url, first_seen)
                 SELECT id, 'berlin', uid, url, first_seen FROM tenders
@@ -148,6 +151,8 @@ def _migrate_columns(conn) -> None:
         ("lowprio_matches", "TEXT NOT NULL DEFAULT '[]'"),
         ("low_priority", "INTEGER NOT NULL DEFAULT 0"),
         ("priority_level", "INTEGER NOT NULL DEFAULT 0"),
+        ("favorite", "INTEGER NOT NULL DEFAULT 0"),
+        ("authority_matches", "TEXT NOT NULL DEFAULT '[]'"),
     ):
         if name not in columns:
             conn.execute(f"ALTER TABLE tenders ADD COLUMN {name} {definition}")
@@ -156,7 +161,7 @@ def _migrate_columns(conn) -> None:
 def row_to_dict(row: sqlite3.Row) -> dict:
     item = dict(row)
     for key in ("cpv_codes", "documents", "cpv_matches", "keyword_matches", "exclusion_matches", "priority_matches",
-                "lowprio_matches"):
+                "lowprio_matches", "authority_matches"):
         if key in item:
             item[key] = json.loads(item[key] or "[]")
     for key in ("feed_fields", "detail_fields"):

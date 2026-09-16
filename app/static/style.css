@@ -135,6 +135,12 @@ tbody tr:hover { background: #fbfaf7; }
 .status-cell { white-space: nowrap; }
 .status-cell form { display: block; margin-top: 0.25rem; }
 
+.pill-fav { color: #b3261e; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+.authority-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; }
+.authority-line form { display: inline-flex; align-items: center; gap: 0.4rem; }
+.fav-block > .region-head { background: #5c1d19; }
+.fav-block > .region-head::before { color: #ff9a8f; }
+.fav-names { margin: -0.2rem 0 0.6rem 0.6rem; font-size: 0.83rem; }
 .pill-important {
   background: #fff1d6; color: #8a4b00; border: 1px solid #f5c26b;
   font-size: 0.66rem; font-weight: 700; padding: 0.02rem 0.35rem; border-radius: 4px; letter-spacing: 0.04em;
@@ -289,7 +295,8 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
 
 @media (max-width: 900px) {
   .detail-grid, .rule-grid { grid-template-columns: 1fr; }
-  .topbar { gap: 0.5rem 0.75rem; padding: 0.6rem 1rem; flex-wrap: wrap; }
+  /* auf dem Handy nicht feststehend – die umgebrochene Kopfleiste würde sonst viel Platz verdecken */
+  .topbar { gap: 0.5rem 0.75rem; padding: 0.6rem 1rem; flex-wrap: wrap; position: static; }
   .topbar nav { flex: 1 1 auto; }
   .container { padding: 1rem; }
   .detail-head { flex-direction: column; }

@@ -173,9 +173,9 @@ def _redirect(url: str, **params) -> RedirectResponse:
 
 # ---------- Liste ----------
 
-def _filters_from(params: dict) -> tenders.Filters:
+def _filters_from(params: dict, default_status: str = "interessant") -> tenders.Filters:
     return tenders.Filters(
-        status=params.get("status", "interessant"),
+        status=params.get("status", default_status),
         kategorie=params.get("kategorie", ""),
         quelle=params.get("quelle", ""),
         q=params.get("q", "").strip(),
@@ -194,14 +194,43 @@ def _limit(params: dict, key: str) -> int:
         return config.PAGE_SIZE
 
 
-def _load_group(filters: tenders.Filters, params: dict, region: tenders.Region, g: dict) -> None:
+def _load_group(
+    filters: tenders.Filters, params: dict, g: dict, region_key: str = "", favorite_pattern: str = "", page: str = "/"
+) -> None:
     """Einträge einer Gruppe laden und Links für „weitere anzeigen“ setzen."""
     limit = _limit(params, g["key"])
-    g.update(tenders.search(filters, region.key, g["group"].categories, limit))
+    g.update(tenders.search(filters, region_key, g["group"].categories, limit, favorite_pattern=favorite_pattern))
     g["loaded"] = True
     key = g["key"]
     more = {**params, f"anzahl_{key}": limit + config.PAGE_SIZE}
-    g["more_url"] = f"/?{urlencode(more)}#gruppe-{key}"
+    g["more_url"] = f"{page}?{urlencode(more)}#gruppe-{key}"
+
+
+def _prepare_groups(filters: tenders.Filters, params: dict, block: dict, block_open: bool, src: str, **load) -> None:
+    """Auf-/Zugeklappt-Zustand setzen; sichtbare Gruppen sofort laden, alle anderen beim Aufklappen (JS)."""
+    for g in block["groups"]:
+        g["force_open"] = bool(filters.kategorie) or f"anzahl_{g['key']}" in params
+        g["open"] = g["group"].open_by_default or g["force_open"]
+        g["src"] = src.format(group=g["group"].key)
+        g["loaded"] = False
+        if block_open and g["open"] and g["total"]:
+            _load_group(filters, params, g, **load)
+
+
+def _page_context(params: dict, filters: tenders.Filters, page: str, **extra) -> dict:
+    tab_params = {k: v for k, v in params.items() if k != "status" and not k.startswith("anzahl_")}
+    context = {
+        "filters": filters,
+        "overview": tenders.overview(),
+        "page_url": page,
+        "base_query": urlencode(tab_params),
+        "current_url": page + (f"?{urlencode(params)}" if params else ""),
+        "show_expired_url": page + "?" + urlencode(
+            {**{k: v for k, v in params.items() if not k.startswith("anzahl_")}, "status": filters.status, "frist": "alle"}
+        ),
+    }
+    context.update(extra)
+    return context
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -217,29 +246,20 @@ def list_view(request: Request, meldung: str = ""):
         r["key"] = region.key
         r["force_open"] = forced
         r["open"] = region.open_by_default or forced
-        for g in r["groups"]:
-            g["force_open"] = bool(filters.kategorie) or f"anzahl_{g['key']}" in params
-            g["open"] = g["group"].open_by_default or g["force_open"]
-            g["src"] = f"/gruppe/{region.key}/{g['group'].key}" + (f"?{base_query}" if base_query else "")
-            g["loaded"] = False
-            # Sichtbare Gruppen sofort laden, alle anderen erst beim Aufklappen (JS)
-            if r["open"] and g["open"] and g["total"]:
-                _load_group(filters, params, region, g)
+        src = f"/gruppe/{region.key}/{{group}}" + (f"?{base_query}" if base_query else "")
+        _prepare_groups(filters, params, r, r["open"], src, region_key=region.key)
 
-    tab_params = {k: v for k, v in params.items() if k != "status" and not k.startswith("anzahl_")}
     return templates.TemplateResponse(
         request,
         "list.html",
-        {
-            "regions": regions,
-            "total": sum(r["total"] for r in regions),
-            "filters": filters,
-            "counts": tenders.status_counts(filters),
-            "overview": tenders.overview(),
-            "base_query": urlencode(tab_params),
-            "current_url": "/" + (f"?{urlencode(params)}" if params else ""),
-            "meldung": meldung,
-        },
+        _page_context(
+            params, filters, "/",
+            regions=regions,
+            total=sum(r["total"] for r in regions),
+            counts=tenders.status_counts(filters),
+            expired_hidden=tenders.expired_hidden(filters),
+            meldung=meldung,
+        ),
     )
 
 
@@ -252,12 +272,82 @@ def group_partial(request: Request, region_key: str, group_key: str):
         raise HTTPException(404, "Gruppe nicht gefunden")
     params = dict(request.query_params)
     g = {"group": group, "key": f"{region.key}-{group.key}"}
-    _load_group(_filters_from(params), params, region, g)
+    _load_group(_filters_from(params), params, g, region_key=region.key)
     return templates.TemplateResponse(
         request,
         "_group_body.html",
         {"g": g, "current_url": "/" + (f"?{urlencode(params)}" if params else "")},
     )
+
+
+# ---------- Beobachtete Auftraggeber ----------
+
+FAVORITES_PAGE = "/auftraggeber"
+
+
+@app.get(FAVORITES_PAGE, response_class=HTMLResponse)
+def favorites_view(request: Request, meldung: str = ""):
+    params = {k: v for k, v in request.query_params.items() if k != "meldung"}
+    filters = _filters_from(params, default_status="alle")
+    base_query = urlencode({k: v for k, v in params.items() if not k.startswith("anzahl_")})
+    patterns = settings.load_favorites()
+
+    blocks = tenders.favorites_structure(filters, patterns)
+    for b in blocks:
+        forced = bool(filters.kategorie) or any(f"anzahl_{g['key']}" in params for g in b["groups"])
+        b["force_open"] = forced
+        b["open"] = True
+        query = urlencode({**{k: v for k, v in params.items() if not k.startswith("anzahl_")}, "ag": b["pattern"]})
+        src = f"{FAVORITES_PAGE}/gruppe/{{group}}?{query}"
+        _prepare_groups(filters, params, b, True, src, favorite_pattern=b["pattern"], page=FAVORITES_PAGE)
+
+    return templates.TemplateResponse(
+        request,
+        "favorites.html",
+        _page_context(
+            params, filters, FAVORITES_PAGE,
+            blocks=blocks,
+            total=tenders.status_counts(filters, favorites_only=True)[filters.status if filters.status in ("interessant", "nicht_interessant") else "alle"],
+            counts=tenders.status_counts(filters, favorites_only=True),
+            expired_hidden=tenders.expired_hidden(filters, favorites_only=True),
+            meldung=meldung,
+            has_inactive=any(not r["active"] for r in settings.list_rules("authority")),
+        ),
+    )
+
+
+@app.get(FAVORITES_PAGE + "/gruppe/{group_key}", response_class=HTMLResponse)
+def favorites_group_partial(request: Request, group_key: str, ag: str = ""):
+    group = tenders.GROUPS_BY_KEY.get(group_key)
+    if group is None or ag not in settings.load_favorites():
+        raise HTTPException(404, "Gruppe nicht gefunden")
+    params = {k: v for k, v in request.query_params.items() if k != "ag"}
+    g = {"group": group, "key": f"{tenders.favorite_key(ag)}-{group.key}"}
+    _load_group(_filters_from(params, default_status="alle"), params, g, favorite_pattern=ag, page=FAVORITES_PAGE)
+    return templates.TemplateResponse(
+        request,
+        "_group_body.html",
+        {"g": g, "current_url": FAVORITES_PAGE + (f"?{urlencode(params)}" if params else "")},
+    )
+
+
+@app.post(FAVORITES_PAGE + "/beobachten")
+def watch_authority(name: str = Form(...), next: str = Form(FAVORITES_PAGE)):
+    added = settings.watch_authority(name)
+    fetcher.refresh_favorites()
+    meldung = f"„{name}“ wird beobachtet." if added else f"„{name}“ wurde bereits beobachtet."
+    return _redirect(_safe_next(next, FAVORITES_PAGE), meldung=meldung)
+
+
+@app.post(FAVORITES_PAGE + "/entfernen")
+async def unwatch_authority(request: Request):
+    form = await request.form()
+    patterns = [p for p in form.getlist("pattern") if p]
+    settings.unwatch_authorities(patterns)
+    fetcher.refresh_favorites()
+    next_url = _safe_next(form.get("next"), FAVORITES_PAGE)
+    names = ", ".join(f"„{p}“" for p in patterns)
+    return _redirect(next_url, meldung=f"Beobachtung von {names} beendet.")
 
 
 @app.post("/gesehen")
@@ -348,6 +438,7 @@ def _settings_context(request: Request, **extra) -> HTMLResponse:
         "feeds": feeds,
         "retention_days": config.REST_RETENTION_DAYS,
         "rules": settings.all_rules(),
+        "authority_names": tenders.overview()["authorities"],
         "rules_dirty": False,
         "times_text": ", ".join(values["schedule_times"]),
         "gap_warning": settings.gap_warning(values),

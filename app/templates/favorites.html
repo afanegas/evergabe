@@ -1,30 +1,35 @@
 {% extends "base.html" %}
-{% block page %}list{% endblock %}
+{% block title %}Beobachtete Auftraggeber{% endblock %}
+{% block page %}favorites{% endblock %}
 {% block next_url %}{{ current_url }}{% endblock %}
 
 {% block content %}
 {% include "_list_head.html" %}
 
-{% if not overview.last_run and not total %}
+{% if not blocks %}
 <div class="empty">
-  {% if fetch_state.running %}
-    Der erste Abruf läuft – die Liste füllt sich gleich.
-  {% else %}
-    Noch keine Daten. Klicke oben auf „Jetzt abrufen“.
-  {% endif %}
+  <p><strong>Noch keine Auftraggeber beobachtet.</strong></p>
+  <p>Öffne einen Eintrag und klicke auf „♥ Auftraggeber beobachten“ – oder trage Auftraggeber unter
+    <a href="/einstellungen#rules">Einstellungen → ♥ Beobachtete Auftraggeber</a> ein.
+    {% if has_inactive %}<br>(Es gibt abgeschaltete Einträge in der Liste.){% endif %}</p>
 </div>
 {% else %}
 
-{% for r in regions %}
-<details class="region" id="gruppe-{{ r.key }}" data-group="{{ r.key }}" {% if r.open %}open{% endif %} {% if r.force_open %}data-force-open{% endif %}>
+{% for b in blocks %}
+<details class="region fav-block" id="gruppe-{{ b.key }}" data-group="{{ b.key }}" {% if b.open %}open{% endif %} {% if b.force_open %}data-force-open{% endif %}>
   <summary class="region-head">
-    <span class="region-title">{{ r.region.label }}</span>
-    <span class="count">{{ r.total }}</span>
-    {% if r.important %}<span class="pill-important">★ {{ r.important }} WICHTIG</span>{% endif %}
-    {% if r.new %}<span class="pill-new">{{ r.new }} NEU</span>{% endif %}
+    <span class="region-title">♥ {{ b.pattern }}</span>
+    <span class="count">{{ b.total }}</span>
+    {% if b.important %}<span class="pill-important">★ {{ b.important }} WICHTIG</span>{% endif %}
+    {% if b.new %}<span class="pill-new">{{ b.new }} NEU</span>{% endif %}
   </summary>
+  {% if b.names %}
+    <p class="fav-names muted">
+      Gefundene Namen: {{ b.names | reject('none') | join(' · ') }}
+    </p>
+  {% endif %}
 
-  {% for g in r.groups %}
+  {% for g in b.groups %}
   <details class="group" id="gruppe-{{ g.key }}" data-group="{{ g.key }}" {% if g.open %}open{% endif %}
            {% if g.force_open %}data-force-open{% endif %} {% if not g.loaded and g.total %}data-src="{{ g.src }}"{% endif %}>
     <summary class="group-head">

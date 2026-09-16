@@ -21,7 +21,7 @@
     <input type="hidden" name="{{ prefix }}-value" value="{{ e.value }}">
     {% if kind == 'cpv' %}
       <input type="hidden" name="{{ prefix }}-label" value="{{ e.label or '' }}">
-    {% else %}
+    {% elif kind != 'authority' %}
       {{ scope_select(prefix ~ '-scope', e.scope or ('titel' if kind == 'lowprio' else 'alles')) }}
     {% endif %}
     <button type="button" class="rule-delete" title="Löschen" aria-label="{{ e.value }} löschen">×</button>
@@ -38,7 +38,11 @@
   </div>
 {% endif %}
 
-<section class="card">
+<datalist id="authority-names">
+  {% for a in authority_names %}<option value="{{ a }}">{% endfor %}
+</datalist>
+
+<section class="card" id="rules">
   <h2>Klassifizierung</h2>
   <p class="muted">
     Jeder Eintrag wird mit zwei getrennten Prüfungen bewertet. Einträge ohne CPV-Codes
@@ -63,6 +67,7 @@
       ('keyword', 'Stichwörter', 'Groß-/Kleinschreibung egal, Wortteile zählen („Klimaschutz“ trifft „Klimaschutzkonzept“). Bis 3 Zeichen oder in "Anführungszeichen" nur als ganzes Wort. * ist ein Platzhalter, auch über einen Bindestrich oder ein Leerzeichen hinweg: Energie*spar*contracting trifft „Energiespar-Contracting“ und „Energieeinsparcontracting“. Mit + verbundene Begriffe müssen alle vorkommen: Konzept + Energie. Je Stichwort wählbar: in Titel + Beschreibung oder nur im Titel suchen. Gilt für alle Stichwort-Listen.'),
       ('exclusion', 'Ausschluss-Stichwörter', 'Kommt eines davon vor, zählt die Stichwort-Prüfung nicht als Treffer.'),
       ('lowprio', '↓ Niedrige Priorität', 'Gilt nur für interessante Einträge und ändert nichts an der Einstufung: Sie werden als „niedrig“ markiert und stehen in ihrer Gruppe unten.'),
+      ('authority', '♥ Beobachtete Auftraggeber', 'Einträge dieser Auftraggeber erscheinen im Reiter „♥ Auftraggeber“ (auch nicht interessante), werden nicht automatisch gelöscht und stehen in der täglichen E-Mail. Name oder Namensteil – „Bezirksamt Mitte“ trifft auch „Bezirksamt Mitte von Berlin“; * und + wie bei Stichwörtern.'),
     ] %}
     <div class="rule-grid">
       {% for kind, title, hint in panels %}
@@ -98,6 +103,8 @@
           {% if kind == 'cpv' %}
             <input type="text" class="rule-add-value narrow-code" placeholder="71314000" inputmode="numeric" aria-label="Neuer CPV-Code">
             <input type="text" class="rule-add-label" placeholder="Bezeichnung (optional)" aria-label="Bezeichnung">
+          {% elif kind == 'authority' %}
+            <input type="text" class="rule-add-value" placeholder="Name oder Namensteil, z. B. Bezirksamt Mitte" aria-label="Neuer Auftraggeber" list="authority-names">
           {% else %}
             <input type="text" class="rule-add-value" placeholder="Neues Stichwort, z. B. Konzept + Energie" aria-label="Neues Stichwort">
             {{ scope_select('', 'titel' if kind == 'lowprio' else 'alles', 'rule-add-scope') }}

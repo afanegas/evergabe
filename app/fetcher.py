@@ -10,7 +10,7 @@ import httpx
 
 from . import config, settings
 from .categories import SOURCE_BERLIN, SOURCE_OV
-from .classify import Rules, classify
+from .classify import Rules, classify, match_terms
 from .db import connect, now, row_to_dict
 from .dedupe import find_duplicate
 from .sources import oeffentlichevergabe
@@ -316,7 +316,10 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
     """Einträge neu einstufen – alle (ids=None) oder nur die angegebenen."""
     rules = rules or settings.load_rules()
     counts = {"gesamt": 0, "interessant": 0}
-    columns = "id, title, subject, service_type, description, detail_fields, cpv_codes, manual_status, auto_status"
+    favorites = settings.load_favorites()
+    columns = (
+        "id, title, subject, service_type, description, detail_fields, cpv_codes, manual_status, auto_status, authority"
+    )
     with connect() as conn:
         if ids is None:
             batches = [conn.execute(f"SELECT {columns} FROM tenders").fetchall()]
@@ -340,7 +343,8 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
                     result.status, result.cpv, _dumps(result.cpv_matches), result.keyword,
                     _dumps(result.keyword_matches), _dumps(result.exclusion_matches),
                     _dumps(result.priority_matches), int(result.important),
-                    _dumps(result.lowprio_matches), int(result.low_priority), result.level, row["id"],
+                    _dumps(result.lowprio_matches), int(result.low_priority), result.level,
+                    *_favorite_values(row["authority"], favorites), row["id"],
                 ))
                 counts["gesamt"] += 1
                 if (row["manual_status"] or result.status) == "interessant":
@@ -348,10 +352,25 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
         conn.executemany(
             "UPDATE tenders SET auto_status = ?, cpv_result = ?, cpv_matches = ?, keyword_result = ?, "
             "keyword_matches = ?, exclusion_matches = ?, priority_matches = ?, important = ?, "
-            "lowprio_matches = ?, low_priority = ?, priority_level = ? WHERE id = ?",
+            "lowprio_matches = ?, low_priority = ?, priority_level = ?, favorite = ?, authority_matches = ? WHERE id = ?",
             updates,
         )
     return counts
+
+
+def _favorite_values(authority: str | None, favorites: list[str]) -> tuple[int, str]:
+    matches = match_terms(authority or "", favorites) if authority else []
+    return int(bool(matches)), _dumps(matches)
+
+
+def refresh_favorites() -> int:
+    """Nur die Markierung „beobachteter Auftraggeber“ neu berechnen (schnell, ohne Neu-Klassifizierung)."""
+    favorites = settings.load_favorites()
+    with connect() as conn:
+        rows = conn.execute("SELECT id, authority FROM tenders").fetchall()
+        updates = [(*_favorite_values(row["authority"], favorites), row["id"]) for row in rows]
+        conn.executemany("UPDATE tenders SET favorite = ?, authority_matches = ? WHERE id = ?", updates)
+    return sum(1 for u in updates if u[0])
 
 
 def reclassify_all(rules: Rules | None = None) -> dict:
@@ -360,10 +379,10 @@ def reclassify_all(rules: Rules | None = None) -> dict:
 
 def cleanup_rest() -> int:
     """Nicht interessante Einträge der Region „Rest“ nach REST_RETENTION_DAYS löschen –
-    außer sie wurden manuell eingestuft oder haben eine Notiz."""
+    außer sie wurden manuell eingestuft, haben eine Notiz oder stammen von einem beobachteten Auftraggeber."""
     cutoff = (datetime.fromisoformat(now()) - timedelta(days=config.REST_RETENTION_DAYS)).isoformat()
     condition = (
-        "region = 'rest' AND manual_status IS NULL AND note IS NULL AND auto_status = 'nicht_interessant' "
+        "region = 'rest' AND manual_status IS NULL AND note IS NULL AND auto_status = 'nicht_interessant' AND favorite = 0 "
         "AND COALESCE(published_at, first_seen) < ?"
     )
     with connect() as conn:

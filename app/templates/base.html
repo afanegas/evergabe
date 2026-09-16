@@ -11,6 +11,7 @@
     <a class="brand" href="/"><span class="brand-mark">eV</span>-Checker</a>
     <nav>
       <a href="/" class="{% if self.page() == 'list' %}active{% endif %}">Ausschreibungen</a>
+      <a href="/auftraggeber" class="{% if self.page() == 'favorites' %}active{% endif %}">♥ Auftraggeber</a>
       <a href="/einstellungen" class="{% if self.page() == 'settings' %}active{% endif %}">Einstellungen</a>
     </nav>
     <form method="post" action="/abrufen" class="fetch-form">

@@ -110,8 +110,8 @@ def seed_priority_rules() -> bool:
     return True
 
 
-RULE_KINDS = ("cpv", "keyword", "priority", "lowprio", "exclusion")
-_RULE_FIELD = re.compile(r"^rule-(cpv|keyword|priority|lowprio|exclusion)-(\d+)-value$")
+RULE_KINDS = ("cpv", "keyword", "priority", "lowprio", "exclusion", "authority")
+_RULE_FIELD = re.compile(r"^rule-(cpv|keyword|priority|lowprio|exclusion|authority)-(\d+)-value$")
 
 
 def seed_lowprio_rules() -> bool:
@@ -189,6 +189,34 @@ def load_rules() -> Rules:
         keyword_enabled=bool(values["keyword_enabled"]),
         combine=values["combine"],
     )
+
+
+def load_favorites() -> list[str]:
+    """Aktive Muster der beobachteten Auftraggeber (Namensteil, * und + wie bei Stichwörtern)."""
+    return [r["value"] for r in list_rules("authority", only_active=True)]
+
+
+def watch_authority(name: str) -> bool:
+    """Auftraggeber beobachten (z. B. aus der Detailseite). False, wenn schon vorhanden."""
+    name = " ".join(name.split())
+    if not name:
+        return False
+    with connect() as conn:
+        existing = conn.execute(
+            "SELECT id, active FROM rules WHERE kind = 'authority' AND lower(value) = lower(?)", (name,)
+        ).fetchone()
+        if existing:
+            conn.execute("UPDATE rules SET active = 1 WHERE id = ?", (existing["id"],))
+            return not existing["active"]
+        conn.execute("INSERT INTO rules(kind, value) VALUES('authority', ?)", (name,))
+    return True
+
+
+def unwatch_authorities(patterns: list[str]) -> int:
+    with connect() as conn:
+        return conn.executemany(
+            "DELETE FROM rules WHERE kind = 'authority' AND value = ?", [(p,) for p in patterns]
+        ).rowcount
 
 
 def default_scope(kind: str) -> str:

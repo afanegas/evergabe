@@ -10,8 +10,9 @@
   </td></tr>
   <tr><td style="padding:18px 20px 6px;">
     {% if test %}<p style="margin:0 0 10px;padding:8px 10px;background:#fff4d6;color:#9a5b00;border-radius:6px;font-size:13px;">Test-Mail – enthält die Treffer der letzten 24 Stunden.</p>{% endif %}
-    <h1 style="margin:0 0 4px;font-size:20px;">{{ total }} neue interessante Treffer</h1>
+    <h1 style="margin:0 0 4px;font-size:20px;">{% if total %}{{ total }} neue interessante Treffer{% else %}Keine neuen interessanten Treffer{% endif %}</h1>
     {% if important %}<p style="margin:0;color:#8a4b00;font-size:14px;">davon ★ {{ important }} wichtig</p>{% endif %}
+    {% if favorite_count %}<p style="margin:2px 0 0;color:#b3261e;font-size:14px;">♥ {{ favorite_count }} neue Einträge beobachteter Auftraggeber (unten)</p>{% endif %}
   </td></tr>
   {% for r in regions %}
   <tr><td style="padding:14px 20px 4px;">
@@ -25,6 +26,7 @@
       <tr><td style="padding:6px 10px;">
         {% if item.important %}<span style="font-size:11px;font-weight:700;color:#8a4b00;background:#fff1d6;border:1px solid #f5c26b;border-radius:4px;padding:0 4px;">★ WICHTIG</span> {% endif %}
         {% if item.low_priority %}<span style="font-size:11px;font-weight:700;color:#5f5e5a;background:#eeede9;border:1px solid #d6d4ce;border-radius:4px;padding:0 4px;">↓ NIEDRIG</span> {% endif %}
+        {% if item.favorite %}<span style="font-size:12px;color:#b3261e;" title="Beobachteter Auftraggeber">♥</span> {% endif %}
         <a href="{{ link }}" style="color:#1d1d1b;font-weight:600;font-size:15px;text-decoration:none;">{{ item.title }}</a>
         <div style="font-size:13px;color:#6b6a66;margin-top:2px;">
           {{ CATEGORY_SHORT[item.category] }}{% if item.authority %} · {{ item.authority }}{% endif %}
@@ -43,6 +45,30 @@
   {% endfor %}
   {% if r.more %}<tr><td style="padding:2px 20px 8px;font-size:13px;color:#6b6a66;">… und {{ r.more }} weitere{% if base_url %} – <a href="{{ base_url }}/" style="color:#e8710a;">in der App ansehen</a>{% endif %}</td></tr>{% endif %}
   {% endfor %}
+  {% if favorites %}
+  <tr><td style="padding:18px 20px 4px;">
+    <h2 style="margin:0;padding:6px 10px;background:#b3261e;color:#ffffff;border-radius:6px;font-size:15px;">♥ Beobachtete Auftraggeber <span style="font-weight:400;">({{ favorite_count }})</span></h2>
+  </td></tr>
+  {% for b in favorites %}
+  <tr><td style="padding:10px 20px 2px;font-size:14px;font-weight:700;">{{ b.pattern }} <span style="font-weight:400;color:#6b6a66;">({{ b["items"] | length }})</span></td></tr>
+  {% for item in b["items"] %}
+  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else item.url %}
+  <tr><td style="padding:4px 20px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+           style="border-left:3px solid {{ '#1f7a45' if item.status == 'interessant' else '#d6d4ce' }};">
+      <tr><td style="padding:4px 10px;">
+        <span style="font-size:11px;color:{{ '#1f7a45' if item.status == 'interessant' else '#6b6a66' }};">{{ 'interessant' if item.status == 'interessant' else 'nicht interessant' }}</span>
+        {% if item.important %}<span style="font-size:11px;font-weight:700;color:#8a4b00;">★ WICHTIG</span>{% endif %}<br>
+        <a href="{{ link }}" style="color:#1d1d1b;font-weight:600;font-size:14px;text-decoration:none;">{{ item.title }}</a>
+        <div style="font-size:12px;color:#6b6a66;margin-top:2px;">
+          {{ CATEGORY_SHORT[item.category] }}{% if item.authority %} · {{ item.authority }}{% endif %}{% if item.deadline %} · {{ item.deadline_label or 'Frist' }}: {{ item.deadline | dt }}{% endif %}
+        </div>
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endfor %}
+  {% endfor %}
+  {% endif %}
   <tr><td style="padding:16px 20px;font-size:12px;color:#6b6a66;border-top:1px solid #e2e0da;">
     Automatische Nachricht des eV-Checkers.{% if base_url %} <a href="{{ base_url }}/einstellungen" style="color:#6b6a66;">E-Mail-Einstellungen</a>{% endif %}
   </td></tr>

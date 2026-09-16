@@ -1,5 +1,7 @@
 """Abfragen für Liste und Detailansicht."""
 
+import hashlib
+import json
 from dataclasses import dataclass
 
 from . import config
@@ -52,14 +54,42 @@ class Filters:
     quelle: str = ""  # berlin | oeffentlichevergabe
     q: str = ""
     vergabestelle: str = ""
-    treffer: str = ""  # cpv | stichwort | wichtig | niedrig | manuell
-    frist: str = ""  # offen
+    treffer: str = ""  # cpv | stichwort | wichtig | niedrig | favorit | manuell
+    frist: str = ""  # "" = abgelaufene ausblenden (Standard) | offen = nur mit offener Frist | alle
     neu: bool = False
     sort: str = "neueste"
 
 
-def _where(filters: Filters, include_status: bool = True, region: str = "", categories: tuple[str, ...] = ()) -> tuple[str, list]:
+def _not_expired() -> tuple[str, list]:
+    """Frist nicht abgelaufen. Fristen ohne Uhrzeit (JJJJ-MM-TT) gelten bis Ende des Tages."""
+    current = now()
+    return (
+        "((length(deadline) = 10 AND deadline >= ?) OR (length(deadline) > 10 AND deadline >= ?))",
+        [current[:10], current[:16]],
+    )
+
+
+def favorite_needle(pattern: str) -> str:
+    """So steht ein Auftraggeber-Muster in der JSON-Spalte authority_matches."""
+    return json.dumps(pattern, ensure_ascii=False)
+
+
+def favorite_key(pattern: str) -> str:
+    return "ag-" + hashlib.md5(pattern.lower().encode("utf-8")).hexdigest()[:8]
+
+
+def _where(
+    filters: Filters,
+    include_status: bool = True,
+    region: str = "",
+    categories: tuple[str, ...] = (),
+    favorite_pattern: str = "",
+    frist: str | None = None,
+) -> tuple[str, list]:
     clauses, params = [], []
+    if favorite_pattern:
+        clauses.append("favorite = 1 AND instr(authority_matches, ?) > 0")
+        params.append(favorite_needle(favorite_pattern))
     if region:
         clauses.append("region = ?")
         params.append(region)
@@ -91,11 +121,20 @@ def _where(filters: Filters, include_status: bool = True, region: str = "", cate
         clauses.append("important = 1")
     elif filters.treffer == "niedrig":
         clauses.append("low_priority = 1")
+    elif filters.treffer == "favorit":
+        clauses.append("favorite = 1")
     elif filters.treffer == "manuell":
         clauses.append("manual_status IS NOT NULL")
-    if filters.frist == "offen":
-        clauses.append("deadline >= ?")
-        params.append(now()[:16])
+    frist = filters.frist if frist is None else frist
+    if frist in ("", "offen", "abgelaufen"):
+        condition, condition_params = _not_expired()
+        if frist == "abgelaufen":  # nur für die Anzeige „N abgelaufene ausgeblendet“
+            clauses.append(f"deadline IS NOT NULL AND deadline != '' AND NOT {condition}")
+        elif frist == "offen":
+            clauses.append(f"deadline IS NOT NULL AND deadline != '' AND {condition}")
+        else:
+            clauses.append(f"(deadline IS NULL OR deadline = '' OR {condition})")
+        params.extend(condition_params)
     if filters.neu:
         clauses.append("seen_at IS NULL")
     return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
@@ -116,8 +155,10 @@ def attach_sources(conn, items: list[dict]) -> None:
         by_id[row["tender_id"]]["sources"].append({"source": row["source"], "url": row["url"]})
 
 
-def search(filters: Filters, region: str, categories: tuple[str, ...], limit: int = config.PAGE_SIZE) -> dict:
-    where, params = _where(filters, region=region, categories=categories)
+def search(
+    filters: Filters, region: str, categories: tuple[str, ...], limit: int = config.PAGE_SIZE, favorite_pattern: str = ""
+) -> dict:
+    where, params = _where(filters, region=region, categories=categories, favorite_pattern=favorite_pattern)
     order = SORTS.get(filters.sort, SORTS["neueste"])
     with connect() as conn:
         total = conn.execute(f"SELECT COUNT(*) FROM tenders{where}", params).fetchone()[0]
@@ -166,8 +207,67 @@ def structure(filters: Filters) -> list[dict]:
     return regions
 
 
-def status_counts(filters: Filters) -> dict:
+def expired_hidden(filters: Filters, favorites_only: bool = False) -> int:
+    """Anzahl der wegen abgelaufener Frist ausgeblendeten Einträge (nur beim Standard-Fristfilter)."""
+    if filters.frist != "":
+        return 0
+    where, params = _where(filters, frist="abgelaufen")
+    if favorites_only:
+        where += (" AND " if where else " WHERE ") + "favorite = 1"
+    with connect() as conn:
+        return conn.execute(f"SELECT COUNT(*) FROM tenders{where}", params).fetchone()[0]
+
+
+def favorites_structure(filters: Filters, patterns: list[str]) -> list[dict]:
+    """Beobachtete Auftraggeber mit Gruppen und Anzahlen (Reiter „♥ Auftraggeber“)."""
+    blocks = []
+    with connect() as conn:
+        for pattern in patterns:
+            where, params = _where(filters, favorite_pattern=pattern)
+            counts = {
+                row[0]: (row[1], row[2], row[3])
+                for row in conn.execute(
+                    f"SELECT category, COUNT(*), COALESCE(SUM(seen_at IS NULL), 0), COALESCE(SUM(important), 0) "
+                    f"FROM tenders{where} GROUP BY category",
+                    params,
+                )
+            }
+            names_where, names_params = _where(Filters(status="alle", frist="alle"), favorite_pattern=pattern)
+            names = [
+                r[0] for r in conn.execute(
+                    f"SELECT authority, COUNT(*) AS n FROM tenders{names_where} GROUP BY authority ORDER BY n DESC LIMIT 6",
+                    names_params,
+                )
+            ]
+            key = favorite_key(pattern)
+            groups = []
+            for group in GROUPS:
+                if filters.kategorie and filters.kategorie not in group.categories:
+                    continue
+                numbers = [counts.get(c, (0, 0, 0)) for c in group.categories]
+                groups.append({
+                    "group": group,
+                    "key": f"{key}-{group.key}",
+                    "total": sum(n[0] for n in numbers),
+                    "new": sum(n[1] for n in numbers),
+                    "important": sum(n[2] for n in numbers),
+                })
+            blocks.append({
+                "pattern": pattern,
+                "key": key,
+                "names": names,
+                "groups": groups,
+                "total": sum(g["total"] for g in groups),
+                "new": sum(g["new"] for g in groups),
+                "important": sum(g["important"] for g in groups),
+            })
+    return blocks
+
+
+def status_counts(filters: Filters, favorites_only: bool = False) -> dict:
     where, params = _where(filters, include_status=False)
+    if favorites_only:
+        where += (" AND " if where else " WHERE ") + "favorite = 1"
     with connect() as conn:
         rows = conn.execute(
             f"SELECT {STATUS_SQL} AS status, COUNT(*) AS n FROM tenders{where} GROUP BY 1", params

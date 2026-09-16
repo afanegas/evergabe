@@ -103,6 +103,15 @@ Stand: 13.09.2026 (Phase 1 fertig)
 - [x] Bereich je Stichwort (alle Stichwort-Listen): Titel + Beschreibung oder nur Titel; gemeinsame Einstellung „Prüfen in“ bei ↓ Niedrig entfällt (Wert wurde auf die Niedrig-Stichwörter übertragen)
 - [x] „Energiemanagementsystem“ als Stichwort und ★ wichtiges Stichwort (einmalige Ergänzung auch in bestehenden Datenbanken)
 
+### Fristen & beobachtete Auftraggeber ✅ (15.09.2026)
+- [x] Abgelaufene Fristen standardmäßig ausblenden; Filter „Fristen“ (ausblenden / nur offene / alle) mit Hinweis „N ausgeblendet – anzeigen“
+- [x] Reiter „♥ Auftraggeber“: je beobachtetem Auftraggeber ein Block (gefundene Namen, Anzahl, NEU, ★), darin die Kategorie-Gruppen; Standard-Reiter „Alle“
+- [x] Beobachten/Beenden auf der Detailseite; Liste „♥ Beobachtete Auftraggeber“ in den Einstellungen (Namensteil, * und +, an/aus)
+- [x] ♥-Markierung in der Hauptliste, Filter „♥ Beobachtete Auftraggeber“
+- [x] Einträge beobachteter Auftraggeber werden nicht automatisch gelöscht
+- [x] Tägliche E-Mail: eigener Abschnitt „♥ Beobachtete Auftraggeber“ (alle neuen Einträge, auch nicht interessante)
+- [x] Kopfleiste auf schmalen Bildschirmen nicht mehr feststehend
+
 ### Vorschläge (14.09.2026, noch nicht umgesetzt)
 - [ ] Treffer-Statistik je Regel (Treffer in 30 Tagen, davon manuell als nicht interessant markiert)
 - [ ] Vorschau vor dem Speichern der Regeln („+12 interessant, −3 niedrig“)

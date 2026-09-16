@@ -1,11 +1,11 @@
 {% if test %}TEST-MAIL (Treffer der letzten 24 Stunden)
 
-{% endif %}eV-Checker – {{ total }} neue interessante Treffer{% if important %}, davon {{ important }} wichtig{% endif %}
+{% endif %}eV-Checker – {{ total }} neue interessante Treffer{% if important %}, davon {{ important }} wichtig{% endif %}{% if favorite_count %}, {{ favorite_count }} von beobachteten Auftraggebern{% endif %}
 
 {% for r in regions %}
 === {{ r.label }} ({{ r["items"] | length + r.more }}) ===
 {% for item in r["items"] %}
-{% if item.important %}[WICHTIG] {% endif %}{% if item.low_priority %}[niedrig] {% endif %}{{ item.title }}
+{% if item.important %}[WICHTIG] {% endif %}{% if item.low_priority %}[niedrig] {% endif %}{% if item.favorite %}[♥] {% endif %}{{ item.title }}
   {{ CATEGORY_SHORT[item.category] }}{% if item.authority %} · {{ item.authority }}{% endif %}
 {% if item.deadline %}  {{ item.deadline_label or 'Frist' }}: {{ item.deadline | dt }}
 {% endif %}{% if item.keyword_matches or item.cpv_matches %}  Treffer: {{ (item.keyword_matches + item.cpv_matches) | join(', ') }}
@@ -13,3 +13,14 @@
 
 {% endfor %}{% if r.more %}  … und {{ r.more }} weitere in der App
 {% endif %}{% endfor %}
+{% if favorites %}
+=== ♥ Beobachtete Auftraggeber ({{ favorite_count }}) ===
+{% for b in favorites %}
+--- {{ b.pattern }} ({{ b["items"] | length }}) ---
+{% for item in b["items"] %}
+{{ 'interessant' if item.status == 'interessant' else 'nicht interessant' }}{% if item.important %} [WICHTIG]{% endif %}: {{ item.title }}
+  {{ CATEGORY_SHORT[item.category] }}{% if item.authority %} · {{ item.authority }}{% endif %}
+{% if item.deadline %}  {{ item.deadline_label or 'Frist' }}: {{ item.deadline | dt }}
+{% endif %}  {% if base_url %}{{ base_url }}/eintrag/{{ item.id }}{% else %}{{ item.url }}{% endif %}
+
+{% endfor %}{% endfor %}{% endif %}

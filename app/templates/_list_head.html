@@ -1,0 +1,77 @@
+{# Kopf der Listen-Seiten (Hauptliste und „♥ Auftraggeber“): Reiter, Filter, Hinweise. Erwartet page_url. #}
+<div class="page-head">
+  <div class="tabs">
+    {% for key, label in [('interessant', 'Interessant'), ('nicht_interessant', 'Nicht interessant'), ('alle', 'Alle')] %}
+      <a class="tab {% if filters.status == key %}active{% endif %}" href="{{ page_url }}?status={{ key }}{% if base_query %}&{{ base_query }}{% endif %}">
+        {{ label }} <span class="count">{{ counts[key] }}</span>
+      </a>
+    {% endfor %}
+  </div>
+  <div class="meta">
+    {% if overview.last_run %}
+      Zuletzt abgerufen: {{ overview.last_run.finished_at | dt }}
+      {% if overview.last_run.new_items %} · {{ overview.last_run.new_items }} neu{% endif %}
+    {% else %}
+      Noch kein Abruf
+    {% endif %}
+  </div>
+</div>
+
+<form class="filters" method="get" action="{{ page_url }}">
+  <input type="hidden" name="status" value="{{ filters.status }}">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Suche in Titel, Beschreibung, CPV …" class="grow">
+  <select name="kategorie">
+    <option value="">Alle Kategorien</option>
+    {% for key, label in CATEGORY_LABELS.items() %}
+      <option value="{{ key }}" {% if filters.kategorie == key %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="quelle">
+    <option value="">Alle Quellen</option>
+    {% for key, label in SOURCE_LABELS.items() %}
+      <option value="{{ key }}" {% if filters.quelle == key %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="vergabestelle" value="{{ filters.vergabestelle }}" placeholder="Vergabestelle" list="authorities">
+  <datalist id="authorities">
+    {% for a in overview.authorities %}<option value="{{ a }}">{% endfor %}
+  </datalist>
+  <select name="treffer">
+    <option value="">Alle Treffer</option>
+    <option value="cpv" {% if filters.treffer == 'cpv' %}selected{% endif %}>CPV-Treffer</option>
+    <option value="stichwort" {% if filters.treffer == 'stichwort' %}selected{% endif %}>Stichwort-Treffer</option>
+    <option value="wichtig" {% if filters.treffer == 'wichtig' %}selected{% endif %}>★ Wichtige Treffer</option>
+    <option value="niedrig" {% if filters.treffer == 'niedrig' %}selected{% endif %}>↓ Niedrige Priorität</option>
+    <option value="favorit" {% if filters.treffer == 'favorit' %}selected{% endif %}>♥ Beobachtete Auftraggeber</option>
+    <option value="manuell" {% if filters.treffer == 'manuell' %}selected{% endif %}>Manuell eingestuft</option>
+  </select>
+  <select name="frist" title="Fristen">
+    <option value="" {% if filters.frist not in ('offen', 'alle') %}selected{% endif %}>Abgelaufene Fristen ausblenden</option>
+    <option value="offen" {% if filters.frist == 'offen' %}selected{% endif %}>Nur offene Fristen</option>
+    <option value="alle" {% if filters.frist == 'alle' %}selected{% endif %}>Alle Fristen anzeigen</option>
+  </select>
+  <select name="sort">
+    <option value="neueste" {% if filters.sort == 'neueste' %}selected{% endif %}>Neueste zuerst</option>
+    <option value="frist" {% if filters.sort == 'frist' %}selected{% endif %}>Frist aufsteigend</option>
+    <option value="titel" {% if filters.sort == 'titel' %}selected{% endif %}>Titel A–Z</option>
+  </select>
+  <label class="check"><input type="checkbox" name="neu" value="1" {% if filters.neu %}checked{% endif %}> nur neue</label>
+  <button type="submit" class="btn">Filtern</button>
+  <a href="{{ page_url }}?status={{ filters.status }}" class="btn btn-ghost">Zurücksetzen</a>
+</form>
+
+<div class="list-actions">
+  <span class="muted">
+    {{ total }} Einträge
+    {% if expired_hidden %}
+      · {{ expired_hidden }} mit abgelaufener Frist ausgeblendet –
+      <a href="{{ show_expired_url }}">anzeigen</a>
+    {% endif %}
+  </span>
+  {% if overview.unseen_interesting %}
+    <form method="post" action="/gesehen">
+      <input type="hidden" name="next" value="{{ current_url }}">
+      <button class="btn btn-ghost btn-sm" type="submit">Alle als gesehen markieren</button>
+    </form>
+  {% endif %}
+</div>

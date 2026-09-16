@@ -20,6 +20,7 @@
         <div class="title-line">
           {% if item.important %}<span class="pill-important" title="Wichtiges Stichwort: {{ item.priority_matches | join(', ') }}">★ WICHTIG</span>{% endif %}
           {% if item.low_priority %}<span class="pill-low" title="Niedrig-Stichwort: {{ item.lowprio_matches | join(', ') }}">↓ NIEDRIG</span>{% endif %}
+          {% if item.favorite %}<span class="pill-fav" title="Beobachteter Auftraggeber: {{ item.authority_matches | join(', ') }}">♥</span>{% endif %}
           {% if not item.seen_at %}<span class="pill-new">NEU</span>{% endif %}
           <a href="/eintrag/{{ item.id }}?zurueck={{ group_url | urlencode }}">{{ item.title }}</a>
         </div>

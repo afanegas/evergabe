@@ -102,6 +102,13 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 - **Ausschreibungen**: Tabs Interessant / Nicht interessant / Alle, Filter, Suche, Einstufung per Klick überschreiben.
   Gruppiert nach Region (Berlin aufgeklappt, Brandenburg und Rest zugeklappt), darin Ausschreibungen,
   Beabsichtigte Vergaben und Vergebene Aufträge. Die Quelle steht an jedem Eintrag.
+- **Fristen**: Einträge mit abgelaufener Frist sind standardmäßig ausgeblendet (Hinweis „N ausgeblendet – anzeigen“);
+  Auswahl im Filter: abgelaufene ausblenden / nur offene Fristen / alle. Einträge ohne Frist bleiben sichtbar.
+- **♥ Auftraggeber**: eigener Reiter für beobachtete Auftraggeber – je Auftraggeber ein Block mit Ausschreibungen,
+  Beabsichtigten Vergaben und Vergebenen Aufträgen, Standard-Reiter „Alle“ (auch nicht interessante). Beobachten per
+  „♥ Auftraggeber beobachten“ auf der Detailseite oder in den Einstellungen (Name oder Namensteil, `*` und `+`).
+  Einträge beobachteter Auftraggeber tragen ♥, werden nicht automatisch gelöscht und stehen in der täglichen E-Mail
+  in einem eigenen Abschnitt.
 - **Detailansicht**: Prüfergebnisse (welche CPV-Codes/Stichwörter gegriffen haben), Beschreibung mit Markierungen, Notiz
 - **Einstellungen**:
   - CPV-Prüfung und Stichwort-Prüfung einzeln an/aus, Verknüpfung ODER / UND

@@ -19,7 +19,26 @@
       {% if was_new %}<span class="pill-new">NEU</span>{% endif %}
     </div>
     <h1>{{ item.title }}</h1>
-    {% if item.authority %}<div class="muted">{{ item.authority }}</div>{% endif %}
+    {% if item.authority %}
+      <div class="authority-line">
+        <span class="muted">{{ item.authority }}</span>
+        {% if item.favorite %}
+          <form method="post" action="/auftraggeber/entfernen" class="inline"
+                onsubmit='return confirm({{ ("Beobachtung beenden für: " ~ (item.authority_matches | join(", ")) ~ "?") | tojson }})'>
+            <input type="hidden" name="next" value="{{ self_url }}">
+            {% for p in item.authority_matches %}<input type="hidden" name="pattern" value="{{ p }}">{% endfor %}
+            <span class="pill-fav" title="Beobachtet über: {{ item.authority_matches | join(', ') }}">♥ beobachtet</span>
+            <button class="btn btn-ghost btn-sm" type="submit">nicht mehr beobachten</button>
+          </form>
+        {% else %}
+          <form method="post" action="/auftraggeber/beobachten" class="inline">
+            <input type="hidden" name="next" value="{{ self_url }}">
+            <input type="hidden" name="name" value="{{ item.authority }}">
+            <button class="btn btn-ghost btn-sm" type="submit">♥ Auftraggeber beobachten</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
   <div class="source-buttons">
     {% for s in item.sources %}
