@@ -291,6 +291,8 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
 .mail-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .small-link { font-size: 0.78rem; word-break: break-all; }
 .feeds input[type=checkbox] { width: 1.05rem; height: 1.05rem; }
+/* statt style-Attributen im HTML – die Seite erlaubt per CSP nur eigene Stylesheets */
+.btn-spaced, .form-spaced { margin-top: 0.75rem; }
 
 
 @media (max-width: 900px) {

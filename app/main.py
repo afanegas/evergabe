@@ -14,6 +14,7 @@ from . import backup, classify, config, fetcher, mailer, scheduler, settings, te
 from .db import init_db, now
 from .categories import CATEGORY_LABELS, CATEGORY_SHORT, REGION_LABELS, SOURCE_LABELS, SOURCE_OV
 from .sources.berlin import FEEDS, Feed
+from .urls import safe_url
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -51,6 +52,24 @@ async def reject_cross_site_posts(request: Request, call_next):
         if origin and origin != "null" and origin.split("://", 1)[-1] != host:
             return HTMLResponse("Anfrage von fremder Seite abgelehnt", status_code=403)
     return await call_next(request)
+
+
+# Die Seite lädt ausschließlich eigene Dateien: keine fremden Skripte, keine eingebetteten Skripte,
+# kein Einbinden in fremde Seiten. Damit bleibt ein Link mit „javascript:“ aus Fremddaten wirkungslos.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; "
+    "script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 templates = Jinja2Templates(directory=config.BASE_DIR / "templates")
@@ -143,7 +162,7 @@ def asset(path: str) -> str:
     return f"/static/{path}?v={version}"
 
 
-templates.env.filters.update(dt=format_dt, days_left=days_left, highlight=highlight)
+templates.env.filters.update(dt=format_dt, days_left=days_left, highlight=highlight, safe_url=safe_url)
 templates.env.globals.update(
     CATEGORY_LABELS=CATEGORY_LABELS,
     CATEGORY_SHORT=CATEGORY_SHORT,
@@ -158,8 +177,16 @@ templates.env.globals.update(
 )
 
 
+# Steuerzeichen werden von Browsern aus Adressen entfernt – „/\t/fremd.example“ würde so zu „//fremd.example“
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
 def _safe_next(url: str | None, default: str = "/") -> str:
-    if url and url.startswith("/") and not url.startswith("//"):
+    r"""Nur Ziele innerhalb der App. Neben „//fremd.example“ deuten Browser auch „/\fremd.example“
+    als fremde Adresse (WHATWG-URL: Rückwärtsschrägstrich zählt wie Schrägstrich)."""
+    if not url or _CONTROL_CHARS.search(url):
+        return default
+    if url.startswith("/") and not url.startswith(("//", "/\\")):
         return url
     return default
 
@@ -188,10 +215,12 @@ def _filters_from(params: dict, default_status: str = "interessant") -> tenders.
 
 
 def _limit(params: dict, key: str) -> int:
+    """Wie viele Einträge eine Gruppe zeigt – mindestens eine Seite, höchstens MAX_PAGE_SIZE."""
     try:
-        return max(int(params.get(f"anzahl_{key}", config.PAGE_SIZE)), config.PAGE_SIZE)
+        wanted = int(params.get(f"anzahl_{key}", config.PAGE_SIZE))
     except ValueError:
         return config.PAGE_SIZE
+    return min(max(wanted, config.PAGE_SIZE), config.MAX_PAGE_SIZE)
 
 
 def _load_group(

@@ -24,7 +24,7 @@
         <span class="muted">{{ item.authority }}</span>
         {% if item.favorite %}
           <form method="post" action="/auftraggeber/entfernen" class="inline"
-                onsubmit='return confirm({{ ("Beobachtung beenden für: " ~ (item.authority_matches | join(", ")) ~ "?") | tojson }})'>
+                data-confirm="Beobachtung beenden für: {{ item.authority_matches | join(', ') }}?">
             <input type="hidden" name="next" value="{{ self_url }}">
             {% for p in item.authority_matches %}<input type="hidden" name="pattern" value="{{ p }}">{% endfor %}
             <span class="pill-fav" title="Beobachtet über: {{ item.authority_matches | join(', ') }}">♥ beobachtet</span>
@@ -42,8 +42,9 @@
   </div>
   <div class="source-buttons">
     {% for s in item.sources %}
-      {% if s.url %}
-        <a class="btn" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ SOURCE_LABELS[s.source] }} ↗</a>
+      {% set source_url = s.url | safe_url %}
+      {% if source_url %}
+        <a class="btn" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{{ SOURCE_LABELS[s.source] }} ↗</a>
       {% endif %}
     {% endfor %}
   </div>
@@ -122,7 +123,15 @@
 <section class="card">
   <h2>Dokumente</h2>
   <ul>
-    {% for d in item.documents %}<li><a href="{{ d.url }}" target="_blank" rel="noopener noreferrer">{{ d.title or d.url }}</a></li>{% endfor %}
+    {% for d in item.documents %}
+      {% set doc_url = d.url | safe_url %}
+      {% if doc_url %}
+        <li><a href="{{ doc_url }}" target="_blank" rel="noopener noreferrer">{{ d.title or d.url }}</a></li>
+      {% else %}
+        {# keine http/https-Adresse – als Text zeigen, statt einen Link anzubieten #}
+        <li>{{ d.title or '' }} <span class="muted">(Adresse nicht übernommen: {{ d.url }})</span></li>
+      {% endif %}
+    {% endfor %}
   </ul>
 </section>
 {% endif %}

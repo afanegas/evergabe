@@ -29,10 +29,16 @@ _RIB_SECTIONS = {
 
 
 def detail_kind(url: str | None) -> str | None:
-    host = urlparse(url or "").netloc.lower()
+    """Welche Detailseite steckt hinter der Adresse – oder None, wenn sie nicht abgerufen werden darf.
+    Geprüft wird der echte Hostname (ohne Benutzerteil und Port) und nur http/https, damit weder
+    „boeseberlin.de“ noch eine Adresse im eigenen Netz als erlaubte Quelle durchgeht."""
+    parts = urlparse(url or "")
+    if parts.scheme.lower() not in ("http", "https"):
+        return None
+    host = (parts.hostname or "").lower()
     if host == "meinauftrag.rib.de":
         return "rib"
-    if host.endswith("berlin.de") and "/vergabeplattform/veroeffentlichungen/" in (url or ""):
+    if (host == "berlin.de" or host.endswith(".berlin.de")) and "/vergabeplattform/veroeffentlichungen/" in (url or ""):
         return "berlin"
     return None
 
@@ -57,7 +63,7 @@ def _list_pairs(node: Tag) -> dict[str, str]:
     return pairs
 
 
-def parse_rib(html: str) -> dict:
+def parse_rib(html: str | bytes) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     root = soup.select_one(".tender-details") or soup
     result: dict = {"cpv_codes": [], "fields": {}}
@@ -102,7 +108,7 @@ def parse_rib(html: str) -> dict:
     return result
 
 
-def parse_berlin(html: str, base_url: str = "https://www.berlin.de") -> dict:
+def parse_berlin(html: str | bytes, base_url: str = "https://www.berlin.de") -> dict:
     soup = BeautifulSoup(html, "html.parser")
     result: dict = {"cpv_codes": [], "fields": {}, "documents": []}
     dl = soup.select_one("dl.list--horizontal")
@@ -148,7 +154,7 @@ def parse_berlin(html: str, base_url: str = "https://www.berlin.de") -> dict:
     return result
 
 
-def parse_detail(url: str, html: str) -> dict | None:
+def parse_detail(url: str, html: str | bytes) -> dict | None:
     kind = detail_kind(url)
     if kind == "rib":
         return parse_rib(html)

@@ -71,10 +71,25 @@ Verschickt werden nur neue interessante Treffer seit der letzten Mail; ohne neue
 
 ### Sicherheit
 
-- Zugang nur über Traefik BasicAuth; die App selbst hat keinen Login.
+- Zugang nur über Traefik BasicAuth; die App selbst hat keinen Login. Deshalb darf die App nie ohne
+  Traefik davor erreichbar sein – das Port-Mapping in der `docker-compose.yml` bleibt zu.
 - Formular-Absendungen von fremden Seiten werden abgelehnt (Schutz gegen CSRF).
-- Der Container läuft nicht als root (`PUID`/`PGID`, Standard 1000).
+- Die Seite setzt eine strenge Content-Security-Policy (nur eigene Dateien, keine Skripte im HTML)
+  sowie `X-Content-Type-Options`, `X-Frame-Options` und `Referrer-Policy`; HSTS kommt von Traefik.
+- Links aus den Quelldaten (Dokumente, Quellenlinks) werden nur als `http`/`https` verlinkt.
+- Ziele von „zurück“/`next` bleiben innerhalb der App (kein Weiterleiten auf fremde Adressen).
+- Detailseiten werden nur von `meinauftrag.rib.de` und `*.berlin.de` geladen, Weiterleitungen nur
+  innerhalb dieser Hosts – eine umgeleitete Adresse kann nicht auf interne Dienste zeigen.
+- Antworten aus dem Netz sind in der Größe begrenzt (`FEED_MAX_BYTES`, `DETAIL_MAX_BYTES`,
+  `OV_MAX_BYTES` in `config.py`), XML mit DTD/Entitäten wird abgelehnt, einzelne Dateien im
+  Tagesexport sind auf 16 MB begrenzt.
+- Der Container läuft nicht als root (`PUID`/`PGID`, Standard 1000), mit schreibgeschütztem
+  Dateisystem (außer `/data` und `/tmp`), ohne zusätzliche Rechte (`no-new-privileges`, `cap_drop`)
+  und mit Speicherobergrenze. Wird der Container mit „OOMKilled“ beendet, `mem_limit` erhöhen.
 - `.env` und `data/` sind in `.gitignore` – Domain, Passwörter und Daten gelangen nicht ins Repository.
+  Die `.env` enthält SMTP-Passwort und BasicAuth-Hash: `chmod 600 .env`.
+- Regelmäßig aktualisieren: `docker compose build --pull --no-cache && docker compose up -d` holt
+  Sicherheitsaktualisierungen für Basis-Image und Python-Pakete.
 
 ## Lokal starten (Windows, ohne Docker)
 

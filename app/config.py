@@ -21,11 +21,20 @@ SCHEDULER_ENABLED = os.environ.get("EVC_DISABLE_SCHEDULER") != "1"
 MAX_SAFE_GAP_HOURS = 48
 
 PAGE_SIZE = 50
+# Obergrenze für „weitere anzeigen“ (anzahl_… in der Adresse) – verhindert riesige Seiten
+MAX_PAGE_SIZE = 1000
 
 # oeffentlichevergabe.de: Tagesexporte, frühestens für gestern
 OV_BACKFILL_DAYS = 7  # beim ersten Abruf so viele Tage rückwirkend
 OV_MAX_DAYS_PER_RUN = 31  # nach längerer Pause höchstens so viele Tage auf einmal nachholen
 OV_TIMEOUT_SECONDS = 180.0
+
+# Obergrenzen für Antworten aus dem Netz. Sie liegen deutlich über den echten Größen und sollen nur
+# verhindern, dass eine fehlerhafte oder manipulierte Antwort den Arbeitsspeicher füllt.
+FEED_MAX_BYTES = 16 * 1024 * 1024  # RSS-Feed (50 Einträge)
+DETAIL_MAX_BYTES = 16 * 1024 * 1024  # einzelne Detailseite
+OV_MAX_BYTES = 150 * 1024 * 1024  # Tagesexport (ZIP) – real einige MB
+DETAIL_MAX_REDIRECTS = 3  # Weiterleitungen nur innerhalb der erlaubten Hosts, siehe sources/details.py
 
 # Warnung anzeigen, wenn eine Quelle so oft hintereinander nicht abgerufen werden konnte
 SOURCE_FAILURE_WARN = 2

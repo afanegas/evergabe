@@ -27,7 +27,7 @@
     <h2 style="margin:0;padding:6px 10px;background:#1d1d1b;color:#ffffff;border-radius:6px;font-size:15px;">{{ r.label }} <span style="font-weight:400;color:#d6d4ce;">({{ r["items"] | length + r.more }})</span></h2>
   </td></tr>
   {% for item in r["items"] %}
-  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else item.url %}
+  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else (item.url | safe_url) %}
   <tr><td style="padding:8px 20px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
            style="border-left:3px solid {{ '#e8710a' if item.important else ('#b8b6b0' if item.low_priority else '#1f7a45') }};{{ 'background:#fffaf2;' if item.important else '' }}">
@@ -60,7 +60,7 @@
   {% for b in favorites %}
   <tr><td style="padding:10px 20px 2px;font-size:14px;font-weight:700;">{{ b.pattern }} <span style="font-weight:400;color:#6b6a66;">({{ b["items"] | length }})</span></td></tr>
   {% for item in b["items"] %}
-  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else item.url %}
+  {% set link = (base_url ~ '/eintrag/' ~ item.id) if base_url else (item.url | safe_url) %}
   <tr><td style="padding:4px 20px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
            style="border-left:3px solid {{ '#1f7a45' if item.status == 'interessant' else '#d6d4ce' }};">

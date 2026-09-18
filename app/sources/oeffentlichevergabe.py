@@ -16,6 +16,12 @@ import zipfile
 from datetime import date
 
 from ..categories import SOURCE_OV
+from . import parse_xml
+
+# Grenzen beim Auspacken (Schutz vor überdimensionierten oder absichtlich aufgeblähten Archiven).
+# Eine Bekanntmachung ist real deutlich unter 1 MB groß.
+MAX_ENTRY_BYTES = 16 * 1024 * 1024
+MAX_TOTAL_BYTES = 512 * 1024 * 1024
 
 EXPORT_URL = "https://oeffentlichevergabe.de/api/notice-exports?pubDay={day}&format=eforms.zip"
 NOTICE_URL = "https://oeffentlichevergabe.de/ui/de/notices/{notice_id}"
@@ -146,7 +152,7 @@ def region_for(codes: list[str]) -> str | None:
 # ---------- Bekanntmachung lesen ----------
 
 def parse_notice(content: bytes) -> dict | None:
-    root = ET.fromstring(content)
+    root = parse_xml(content)
     category = _NOTICE_TYPES.get(_text(root, "NoticeTypeCode") or "")
     if category is None:
         return None
@@ -317,15 +323,26 @@ def _amount(el: ET.Element | None) -> str | None:
 
 
 def parse_export(content: bytes) -> tuple[list[dict], int]:
-    """Liest einen Tagesexport. Liefert (Einträge, Anzahl übersprungener Bekanntmachungen)."""
-    items, skipped = [], 0
+    """Liest einen Tagesexport. Liefert (Einträge, Anzahl übersprungener Bekanntmachungen).
+    Einzelne Dateien über MAX_ENTRY_BYTES werden übersprungen; ist das Archiv insgesamt größer
+    als MAX_TOTAL_BYTES, wird abgebrochen."""
+    items, skipped, total = [], 0, 0
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         for name in archive.namelist():
             if not name.lower().endswith(".xml"):
                 continue
+            with archive.open(name) as member:
+                # eins mehr als erlaubt lesen: so fällt auch eine falsch angegebene Größe auf
+                data = member.read(MAX_ENTRY_BYTES + 1)
+            if len(data) > MAX_ENTRY_BYTES:
+                skipped += 1
+                continue
+            total += len(data)
+            if total > MAX_TOTAL_BYTES:
+                raise ValueError(f"Export ist unerwartet groß (über {MAX_TOTAL_BYTES // 1024 // 1024} MB) – Abbruch")
             try:
-                item = parse_notice(archive.read(name))
-            except ET.ParseError:
+                item = parse_notice(data)
+            except (ET.ParseError, ValueError):
                 item = None
             if item is None:
                 skipped += 1
