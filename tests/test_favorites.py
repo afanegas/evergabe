@@ -180,4 +180,9 @@ def test_mail_has_favorites_section(client, monkeypatch):
     assert "neue Einträge beobachteter Auftraggeber" in message["Subject"]
     html = message.get_body(("html",)).get_content()
     assert "♥ Beobachtete Auftraggeber" in html and "Rahmenvertrag Schädlingsbekämpfung 2026" in html
+    assert 'href="/auftraggeber"' not in html and "eV-Checker öffnen" not in html  # ohne App-Adresse keine App-Links
+    monkeypatch.setattr(config, "BASE_URL", "https://evchecker.example.org")
+    html = mailer.build_message([], ["a@example.org"], favorites=mailer.collect_favorites("2000-01-01T00:00:00")) \
+        .get_body(("html",)).get_content()
+    assert 'href="https://evchecker.example.org/auftraggeber"' in html
     assert "nicht interessant" in message.get_body(("plain",)).get_content()

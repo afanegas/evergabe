@@ -115,6 +115,11 @@ def test_normal_and_priority_duplicates_are_listed_once():
     ("Energieeinspar Contracting", True),
     ("Energieliefer-Contracting", False),
     ("Energiemanagement und Contracting", False),  # nicht über mehrere Wörter hinweg
+    ("energiespar contracting", True),
+    ("Energiespar  Contracting", True),  # doppeltes Leerzeichen (kommt in Feeds vor)
+    ("Energiespar- Contracting", True),
+    ("Energiespar – Contracting", True),  # Gedankenstrich
+    ("Energie-Einspar-Contracting", True),
 ])
 def test_wildcard_keyword(text, expected):
     assert bool(match_terms(f"Ausschreibung {text} Schule", ["Energie*spar*contracting"])) is expected

@@ -133,8 +133,10 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 
 Einträge ohne CPV-Codes (Vergebene Aufträge, Vorinformationen) werden nur über Stichwörter bewertet.
 Stichwörter mit bis zu 3 Zeichen (z. B. `PV`) oder in Anführungszeichen zählen nur als ganzes Wort.
-`*` ist ein Platzhalter für beliebige Buchstaben, auch über einen Bindestrich oder ein Leerzeichen hinweg
-(`Energie*spar*contracting` trifft „Energiespar-Contracting“, „Energieeinspar Contracting“ usw.).
+`*` ist ein Platzhalter für beliebige Buchstaben, auch über eine Trennstelle hinweg (bis zu drei Leerzeichen,
+Bindestriche oder Gedankenstriche, z. B. „- “ oder ein doppeltes Leerzeichen): `Energie*spar*contracting` trifft
+„Energiespar-Contracting“, „Energieeinspar Contracting“, „Energiespar  Contracting“ usw., aber nicht
+„Energiemanagement und Contracting“.
 Mit `+` verbundene Begriffe müssen alle vorkommen, egal wo und in welcher Reihenfolge (`Konzept + Energie`).
 Für jedes Stichwort ist wählbar, ob im Titel und in der Beschreibung oder nur im Titel gesucht wird
 (Standard: Titel + Beschreibung, bei ↓ Niedrig nur Titel).

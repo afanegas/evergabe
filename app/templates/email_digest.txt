@@ -1,6 +1,10 @@
 {% if test %}TEST-MAIL (Treffer der letzten 24 Stunden)
 
 {% endif %}eV-Checker – {{ total }} neue interessante Treffer{% if important %}, davon {{ important }} wichtig{% endif %}{% if favorite_count %}, {{ favorite_count }} von beobachteten Auftraggebern{% endif %}
+{% if base_url %}
+App öffnen: {{ base_url }}/
+{% if favorite_count %}Beobachtete Auftraggeber: {{ base_url }}/auftraggeber
+{% endif %}{% endif %}
 
 {% for r in regions %}
 === {{ r.label }} ({{ r["items"] | length + r.more }}) ===

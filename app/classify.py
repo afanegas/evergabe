@@ -82,10 +82,11 @@ def match_cpv(item_codes: list[str], rule_codes: list[str]) -> list[str]:
     return [rule for rule in rule_codes if any(d.startswith(cpv_prefix(rule)) for d in digits)]
 
 
-# Platzhalter *: beliebige Buchstaben/Ziffern, höchstens über einen Bindestrich oder ein Leerzeichen hinweg
-# ("Energie*contracting" trifft "Energiesparcontracting", "Energiespar-Contracting", "Energiespar Contracting",
-# aber nicht "Energiemanagement und Contracting").
-WILDCARD_REGEX = r"\w*(?:[ \-]\w*)?"
+# Platzhalter *: beliebige Buchstaben/Ziffern, höchstens über eine Trennstelle hinweg (1–3 Leerzeichen,
+# Bindestriche oder Gedankenstriche, z. B. "- " oder doppeltes Leerzeichen aus den Feeds).
+# "Energie*contracting" trifft "Energiesparcontracting", "Energiespar-Contracting", "Energiespar  Contracting",
+# aber nicht "Energiemanagement und Contracting" (zwei Trennstellen).
+WILDCARD_REGEX = r"\w*(?:[ \-‐‑–]{1,3}\w*)?"
 
 
 @lru_cache(maxsize=4096)

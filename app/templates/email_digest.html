@@ -13,6 +13,14 @@
     <h1 style="margin:0 0 4px;font-size:20px;">{% if total %}{{ total }} neue interessante Treffer{% else %}Keine neuen interessanten Treffer{% endif %}</h1>
     {% if important %}<p style="margin:0;color:#8a4b00;font-size:14px;">davon ★ {{ important }} wichtig</p>{% endif %}
     {% if favorite_count %}<p style="margin:2px 0 0;color:#b3261e;font-size:14px;">♥ {{ favorite_count }} neue Einträge beobachteter Auftraggeber (unten)</p>{% endif %}
+    {% if base_url %}
+    <p style="margin:14px 0 0;">
+      <a href="{{ base_url }}/" style="display:inline-block;background:#e8710a;color:#ffffff;font-weight:700;font-size:14px;text-decoration:none;padding:9px 16px;border-radius:6px;">eV-Checker öffnen</a>
+      {% if favorite_count %}
+      <a href="{{ base_url }}/auftraggeber" style="display:inline-block;margin-left:6px;color:#b3261e;font-weight:600;font-size:14px;text-decoration:none;padding:9px 4px;">♥ Beobachtete Auftraggeber</a>
+      {% endif %}
+    </p>
+    {% endif %}
   </td></tr>
   {% for r in regions %}
   <tr><td style="padding:14px 20px 4px;">

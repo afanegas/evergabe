@@ -95,6 +95,10 @@ def test_digest_contains_new_interesting_entries_and_only_once(client):
     text = message.get_body(("plain",)).get_content()
     assert "Glasfaserausbau und Signallieferung" in html and "★ WICHTIG" in html
     assert "https://evchecker.example.org/eintrag/" in html and "[WICHTIG]" in text
+    # Link zur App gleich am Anfang
+    assert html.index('href="https://evchecker.example.org/"') < html.index("Glasfaserausbau")
+    assert "eV-Checker öffnen" in html
+    assert text.index("App öffnen: https://evchecker.example.org/") < text.index("Glasfaserausbau")
 
     # zweiter Lauf ohne neue Einträge: keine Mail
     result = mailer.run_digest()
