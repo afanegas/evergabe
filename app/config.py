@@ -51,3 +51,10 @@ SMTP_USER = os.environ.get("EVC_SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("EVC_SMTP_PASSWORD", "")
 SMTP_FROM = os.environ.get("EVC_SMTP_FROM", "") or SMTP_USER
 MAIL_MAX_ITEMS_PER_REGION = 40  # längere Listen werden in der Mail gekürzt („… und N weitere“)
+# Die Mail berichtet über alles, was seit der letzten Mail dazugekommen ist – höchstens aber über so viele Tage.
+# Sonst kommt nach einer Pause (Mail aus, Versand fehlgeschlagen, tagelang nichts Interessantes) eine Riesen-Mail.
+MAIL_MAX_LOOKBACK_DAYS = 3
+# Bekanntmachungen, die bei ihrer Veröffentlichung schon älter als so viele Tage waren, kommen nicht in die Mail.
+# Sie werden trotzdem gespeichert und stehen in der App – nur „neu“ sind sie nicht (Nachladen alter Tage von
+# oeffentlichevergabe.de, siehe OV_BACKFILL_DAYS / OV_MAX_DAYS_PER_RUN).
+MAIL_MAX_AGE_DAYS = 14

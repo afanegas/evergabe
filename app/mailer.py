@@ -4,6 +4,11 @@ SMTP-Zugangsdaten kommen aus Umgebungsvariablen (siehe config.py / .env.example)
 Empfänger, Uhrzeit und An/Aus werden in der App eingestellt.
 Es wird nur verschickt, wenn es seit der letzten Mail neue interessante Einträge oder neue Einträge
 beobachteter Auftraggeber gibt (eigener Abschnitt, auch nicht interessante).
+
+„Neu“ heißt: seit der letzten Mail in die Datenbank gekommen (first_seen), höchstens aber
+MAIL_MAX_LOOKBACK_DAYS zurück – und nur, wenn die Bekanntmachung selbst nicht älter als
+MAIL_MAX_AGE_DAYS ist. Sonst stünden nach einer Pause oder nach dem Nachladen alter Tage von
+oeffentlichevergabe.de wochenalte Bekanntmachungen als „neue Treffer“ in der Mail.
 """
 
 import logging
@@ -65,28 +70,47 @@ def parse_recipients(text: str) -> tuple[list[str], list[str]]:
     return recipients, invalid
 
 
-def collect(since: str) -> list[dict]:
-    """Interessante Einträge (inkl. manuell eingestufter), die seit `since` neu hinzugekommen sind."""
+def since_floor(started: str) -> str:
+    """Frühester Zeitpunkt, über den eine Mail berichtet – auch wenn die letzte Mail länger her ist."""
+    return (datetime.fromisoformat(started) - timedelta(days=config.MAIL_MAX_LOOKBACK_DAYS)).isoformat(timespec="seconds")
+
+
+def published_cutoff(started: str) -> str:
+    """Bekanntmachungen, die vor diesem Tag veröffentlicht wurden, gelten nicht mehr als neu (JJJJ-MM-TT)."""
+    return (datetime.fromisoformat(started) - timedelta(days=config.MAIL_MAX_AGE_DAYS)).date().isoformat()
+
+
+# Veröffentlichungsdatum, nach dem die Mail filtert. Fehlt es (kommt vor allem bei älteren Berlin-Einträgen vor),
+# zählt ersatzweise der Zeitpunkt, an dem der eV-Checker den Eintrag zuerst gesehen hat.
+_PUBLISHED_SQL = "substr(COALESCE(NULLIF(published_at, ''), NULLIF(online_since, ''), first_seen), 1, 10)"
+_NEW_SQL = f"first_seen > ? AND {_PUBLISHED_SQL} >= ?"
+_ORDER_SQL = "ORDER BY priority_level DESC, deadline IS NULL, deadline ASC, id"
+
+
+def collect(since: str, published_from: str = "") -> list[dict]:
+    """Interessante Einträge (inkl. manuell eingestufter), die seit `since` neu hinzugekommen sind und
+    nicht vor `published_from` veröffentlicht wurden."""
+    published_from = published_from or published_cutoff(now())
     with connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM tenders WHERE first_seen > ? AND COALESCE(manual_status, auto_status) = 'interessant' "
-            "ORDER BY priority_level DESC, deadline IS NULL, deadline ASC, id",
-            (since,),
+            f"SELECT * FROM tenders WHERE {_NEW_SQL} AND COALESCE(manual_status, auto_status) = 'interessant' "
+            f"{_ORDER_SQL}",
+            (since, published_from),
         ).fetchall()
         items = [row_to_dict(r) for r in rows]
         attach_sources(conn, items)
     return items
 
 
-def collect_favorites(since: str) -> list[dict]:
+def collect_favorites(since: str, published_from: str = "") -> list[dict]:
     """Neue Einträge beobachteter Auftraggeber (alle Einstufungen), je Auftraggeber-Muster gruppiert.
     Ein Eintrag, der mehrere Muster trifft, steht nur beim ersten."""
     patterns = settings.load_favorites()
+    published_from = published_from or published_cutoff(now())
     with connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM tenders WHERE first_seen > ? AND favorite = 1 "
-            "ORDER BY priority_level DESC, deadline IS NULL, deadline ASC, id",
-            (since,),
+            f"SELECT * FROM tenders WHERE {_NEW_SQL} AND favorite = 1 {_ORDER_SQL}",
+            (since, published_from),
         ).fetchall()
         items = [row_to_dict(r) for r in rows]
         attach_sources(conn, items)
@@ -174,11 +198,13 @@ def run_digest(test: bool = False) -> dict:
 
     started = now()
     yesterday = (datetime.fromisoformat(started) - timedelta(days=1)).isoformat(timespec="seconds")
-    since = yesterday if test else (values["mail_last_sent_at"] or yesterday)
-    items = collect(since)
-    favorites = collect_favorites(since)
+    # Nie weiter zurück als MAIL_MAX_LOOKBACK_DAYS, egal wie lange die letzte Mail her ist
+    since = yesterday if test else max(values["mail_last_sent_at"] or yesterday, since_floor(started))
+    published_from = published_cutoff(started)
+    items = collect(since, published_from)
+    favorites = collect_favorites(since, published_from)
     if not items and not favorites and not test:
-        log.info("Tägliche E-Mail: keine neuen Treffer seit %s", since)
+        log.info("Tägliche E-Mail: keine neuen Treffer seit %s (veröffentlicht ab %s)", since, published_from)
         settings.set_many({"mail_last_check": {"at": started, "sent": False, "count": 0, "error": None}})
         return {"sent": False, "reason": "Keine neuen interessanten Treffer", "count": 0}
 
