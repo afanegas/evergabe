@@ -110,12 +110,14 @@ def test_list_is_grouped_by_region_then_group(client):
 
 
 def test_more_link_raises_group_limit(client, monkeypatch):
+    # frist=alle, weil die Fixture feste Fristen hat: sonst hängt die Anzahl davon ab, wie viele davon
+    # am Tag des Testlaufs schon abgelaufen sind. Hier geht es nur um „weitere anzeigen“.
     monkeypatch.setattr(config, "PAGE_SIZE", 20)
-    html = client.get("/?status=alle").text
+    html = client.get("/?status=alle&frist=alle").text
     first_group = html.split('id="gruppe-berlin-beabsichtigt"')[0]
     assert "20 von 50" in first_group
     assert "anzahl_berlin-ausschreibungen=40#gruppe-berlin-ausschreibungen" in first_group
-    html = client.get("/?status=alle&anzahl_berlin-ausschreibungen=60").text
+    html = client.get("/?status=alle&frist=alle&anzahl_berlin-ausschreibungen=60").text
     assert "weitere anzeigen" not in html.split('id="gruppe-berlin-beabsichtigt"')[0]
 
 
