@@ -475,6 +475,8 @@ def _settings_context(request: Request, **extra) -> HTMLResponse:
         "runs": fetcher.last_runs(),
         "smtp_summary": mailer.smtp_summary(),
         "mail_next_run": scheduler.next_run("mail"),
+        "mail_lookback_days": config.MAIL_MAX_LOOKBACK_DAYS,
+        "mail_max_age_days": config.MAIL_MAX_AGE_DAYS,
         "backups": backup.list_backups(),
         "backup_next_run": scheduler.next_run("backup"),
         "backup_keep": config.BACKUP_KEEP,

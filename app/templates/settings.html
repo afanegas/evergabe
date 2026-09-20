@@ -216,6 +216,12 @@
     Einmal am Tag eine Mail mit den seit der letzten Mail neu hinzugekommenen interessanten Treffern
     (★ wichtige zuerst, nach Region). Gibt es keine neuen Treffer, wird nichts verschickt.
   </p>
+  <p class="muted"><small>
+    Die Mail blickt höchstens {{ mail_lookback_days }} Tage zurück – nach einer längeren Pause gibt es also keine
+    Sammelmail über Wochen. Außerdem kommen nur Bekanntmachungen hinein, die nicht älter als
+    {{ mail_max_age_days }} Tage sind: Werden alte Tage von oeffentlichevergabe.de nachgeladen, sind deren
+    Bekanntmachungen zwar neu im eV-Checker, aber nicht neu veröffentlicht. Sie stehen weiterhin in der Liste.
+  </small></p>
   {% if smtp_summary %}
     <p><small class="muted">SMTP (aus der .env): {{ smtp_summary }}</small></p>
   {% else %}

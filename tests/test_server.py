@@ -1,6 +1,7 @@
 """Phase 2: Health-Check, Schutz gegen fremde Formular-Absendungen, E-Mail und Datensicherung."""
 
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app import backup, config, fetcher, mailer, main, settings
 from app.db import connect
+from app.db import now as db_now
 from app.sources.berlin import parse_feed
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -47,6 +49,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "SMTP_USER", "evchecker@example.org")
     monkeypatch.setattr(config, "SMTP_PASSWORD", "geheim")
     monkeypatch.setattr(config, "BASE_URL", "https://evchecker.example.org")
+    # Die Fixtures haben feste Veröffentlichungsdaten – die Altersgrenze der Mail darf hier nicht greifen
+    monkeypatch.setattr(config, "MAIL_MAX_AGE_DAYS", 36500)
     monkeypatch.setattr(mailer.smtplib, "SMTP", FakeSMTP)
     FakeSMTP.sent = []
     with TestClient(main.app) as c:
@@ -141,3 +145,49 @@ def test_redirect_keeps_message_before_fragment(client):
     response = client.post("/einstellungen/backup", follow_redirects=False)
     location = response.headers["location"]
     assert location.startswith("/einstellungen?meldung=") and location.endswith("#backup")
+
+
+def _insert(title: str, first_seen: str, published_at: str | None, online_since: str | None = None) -> int:
+    """Eintrag direkt in die Datenbank legen – für die Zeitraum-Regeln der Mail."""
+    with connect() as conn:
+        return conn.execute(
+            "INSERT INTO tenders(uid, category, title, published_at, online_since, auto_status, first_seen, last_seen,"
+            " region) VALUES(?, 'bekanntmachung', ?, ?, ?, 'interessant', ?, ?, 'berlin')",
+            (f"test:{title}", title, published_at, online_since, first_seen, first_seen),
+        ).lastrowid
+
+
+def test_digest_skips_old_announcements_that_were_imported_late(client, monkeypatch):
+    """Nachgeladene Tage von oeffentlichevergabe.de bringen alte Bekanntmachungen mit frischem
+    first_seen – die sind neu im eV-Checker, aber nicht neu veröffentlicht."""
+    monkeypatch.setattr(config, "MAIL_MAX_AGE_DAYS", 14)
+    started = db_now()
+    heute = datetime.fromisoformat(started)
+    _insert("Frisch veröffentlicht", started, (heute - timedelta(days=2)).date().isoformat())
+    _insert("Vor Wochen veröffentlicht", started, (heute - timedelta(days=40)).date().isoformat())
+    # ohne published_at zählt „Online seit“, sonst first_seen
+    _insert("Nur Online seit", started, None, (heute - timedelta(days=40)).date().isoformat())
+    _insert("Ohne jedes Datum", started, None, None)
+
+    since = (heute - timedelta(hours=1)).isoformat(timespec="seconds")
+    titles = [i["title"] for i in mailer.collect(since, mailer.published_cutoff(started))]
+    assert "Frisch veröffentlicht" in titles and "Ohne jedes Datum" in titles
+    assert "Vor Wochen veröffentlicht" not in titles and "Nur Online seit" not in titles
+
+
+def test_digest_lookback_is_capped(client, monkeypatch):
+    """Nach einer langen Pause (Mail aus, Versand fehlgeschlagen) darf keine Sammelmail über Wochen kommen."""
+    monkeypatch.setattr(config, "MAIL_MAX_LOOKBACK_DAYS", 3)
+    started = db_now()
+    heute = datetime.fromisoformat(started)
+    _insert("Von gestern", (heute - timedelta(days=1)).isoformat(timespec="seconds"),
+            (heute - timedelta(days=1)).date().isoformat())
+    _insert("Von vor zehn Tagen", (heute - timedelta(days=10)).isoformat(timespec="seconds"),
+            (heute - timedelta(days=10)).date().isoformat())
+
+    settings.set_many({"mail_enabled": True, "mail_to": "a@example.org",
+                       "mail_last_sent_at": (heute - timedelta(days=30)).isoformat(timespec="seconds")})
+    FakeSMTP.sent = []
+    assert mailer.run_digest()["sent"]
+    html = FakeSMTP.sent[-1].get_body(("html",)).get_content()
+    assert "Von gestern" in html and "Von vor zehn Tagen" not in html
