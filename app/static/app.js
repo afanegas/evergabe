@@ -230,3 +230,11 @@
     if (dirty && !submitting) { event.preventDefault(); event.returnValue = ""; }
   });
 })();
+
+// Rückfrage vor dem Absenden (data-confirm am Formular). Früher ein onsubmit-Attribut – die
+// Sicherheitsrichtlinie der Seite (CSP) erlaubt keine Skripte im HTML.
+document.addEventListener("submit", function (event) {
+  const form = event.target;
+  const message = form && form.dataset ? form.dataset.confirm : "";
+  if (message && !window.confirm(message)) event.preventDefault();
+});

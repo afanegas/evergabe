@@ -2,9 +2,10 @@
 
 import html
 import re
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
+
+from . import parse_xml
 
 BASE_URL = "https://www.berlin.de/vergabeplattform/veroeffentlichungen"
 
@@ -102,7 +103,7 @@ def _normalize(category: str, title: str, link: str, guid: str, pub_date: str, f
 
 
 def parse_feed(content: bytes | str, category: str) -> list[dict]:
-    root = ET.fromstring(content)
+    root = parse_xml(content)
     items = []
     for item in root.iter("item"):
         title = clean_text(item.findtext("title"))

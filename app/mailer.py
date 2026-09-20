@@ -19,6 +19,7 @@ from . import config, settings
 from .categories import CATEGORY_SHORT, REGION_LABELS, SOURCE_LABELS
 from .db import connect, now, row_to_dict
 from .tenders import REGIONS, attach_sources
+from .urls import safe_url
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ def _format_dt(value: str | None) -> str:
 
 
 _env.filters["dt"] = _format_dt
+
+
+_env.filters["safe_url"] = safe_url
 
 
 def smtp_configured() -> bool:

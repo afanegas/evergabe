@@ -23,19 +23,45 @@ services:
       - EVC_BACKUP_KEEP=${EVC_BACKUP_KEEP:-14}
     volumes:
       - ./data:/data
+# Nicht aufmachen: ohne Traefik davor wäre die App ohne Passwort erreichbar (und Docker umgeht dabei
+# die Firewall des Hosts). Zum Testen nur an die lokale Adresse binden:  - "127.0.0.1:8765:8000"
 #    ports:
 #      - 8765:8000
     networks:
       - traefik_proxy
     restart: unless-stopped
+    # ---------- Absicherung des Containers ----------
+    # Obergrenze für den Arbeitsspeicher (der Tagesexport von oeffentlichevergabe.de und das
+    # Neu-Einstufen aller Einträge sind die größten Posten). Bei „OOMKilled“ hier erhöhen.
+    mem_limit: 2g
+    pids_limit: 256
+    # Dateisystem des Containers schreibgeschützt – geschrieben wird nur in /data und /tmp
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # nur was der Start braucht: Datenordner übernehmen und Rechte an PUID/PGID abgeben
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ev-checker.rule=Host(`${EVC_DOMAIN}`)"
       - "traefik.http.routers.ev-checker.entrypoints=websecure"
       - "traefik.http.routers.ev-checker.tls=true"
       - "traefik.http.routers.ev-checker.tls.certresolver=le"
-      - "traefik.http.routers.ev-checker.middlewares=ev-checker-auth"
+      - "traefik.http.routers.ev-checker.middlewares=ev-checker-auth,ev-checker-headers"
       - "traefik.http.middlewares.ev-checker-auth.basicauth.users=${EVC_BASIC_AUTH}"
+      # HSTS: nur Traefik weiß von TLS, deshalb hier und nicht in der App. Ohne includeSubdomains,
+      # damit andere Dienste auf Nachbar-Domains nicht betroffen sind.
+      - "traefik.http.middlewares.ev-checker-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.ev-checker-headers.headers.stsIncludeSubdomains=false"
       - "traefik.http.services.ev-checker.loadbalancer.server.port=8000"
       - "traefik.docker.network=traefik_proxy"
 

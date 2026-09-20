@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from datetime import date, datetime, timedelta
+from urllib.parse import urljoin
 
 import httpx
 
@@ -39,6 +40,43 @@ def _client() -> httpx.Client:
         timeout=config.HTTP_TIMEOUT_SECONDS,
         follow_redirects=True,
     )
+
+
+def _get(client: httpx.Client, url: str, max_bytes: int, timeout: float | None = None,
+         follow_redirects: bool = True) -> tuple[bytes, str | None]:
+    """Antwort laden, aber höchstens `max_bytes` – eine überdimensionierte Antwort soll nicht den
+    Arbeitsspeicher füllen. Mit follow_redirects=False wird das Ziel einer Weiterleitung
+    zurückgegeben, statt ihr zu folgen (zweiter Rückgabewert)."""
+    options = {"follow_redirects": follow_redirects}
+    if timeout is not None:
+        options["timeout"] = timeout
+    with client.stream("GET", url, **options) as response:
+        if not follow_redirects and response.is_redirect:
+            location = response.headers.get("location", "").strip()
+            if not location:
+                raise RuntimeError("Weiterleitung ohne Ziel")
+            return b"", urljoin(str(response.url), location)
+        response.raise_for_status()
+        chunks, size = [], 0
+        for chunk in response.iter_bytes():
+            size += len(chunk)
+            if size > max_bytes:
+                raise RuntimeError(f"Antwort größer als {max_bytes // 1024 // 1024} MB – abgebrochen")
+            chunks.append(chunk)
+    return b"".join(chunks), None
+
+
+def fetch_detail_page(client: httpx.Client, url: str) -> bytes:
+    """Detailseite laden. Weiterleitungen werden nur innerhalb der erlaubten Hosts verfolgt, damit eine
+    umgeleitete Adresse nicht auf einen internen Dienst zeigen kann (siehe sources/details.detail_kind)."""
+    for _ in range(config.DETAIL_MAX_REDIRECTS + 1):
+        content, redirect = _get(client, url, config.DETAIL_MAX_BYTES, follow_redirects=False)
+        if redirect is None:
+            return content
+        if detail_kind(redirect) is None:
+            raise RuntimeError(f"Weiterleitung auf nicht erlaubte Adresse: {redirect}")
+        url = redirect
+    raise RuntimeError("Zu viele Weiterleitungen")
 
 
 def _dumps(value) -> str:
@@ -183,9 +221,8 @@ def fetch_berlin_feeds(client: httpx.Client, feeds, feed_status: dict) -> tuple[
     for i, feed in enumerate(feeds):
         status = {"at": now(), "items": 0, "new": 0, "error": None}
         try:
-            response = client.get(feed.url)
-            response.raise_for_status()
-            items = parse_feed(response.content, feed.key)
+            content, _ = _get(client, feed.url, config.FEED_MAX_BYTES)
+            items = parse_feed(content, feed.key)
             with connect() as conn:
                 stats = upsert_items(conn, items, SOURCE_BERLIN)
             _add(totals, stats)
@@ -233,9 +270,9 @@ def fetch_oeffentlichevergabe(client: httpx.Client, last_day: str | None) -> tup
     for i, day in enumerate(days):
         state["phase"] = f"oeffentlichevergabe.de – {day:%d.%m.%Y}"
         try:
-            response = client.get(oeffentlichevergabe.export_url(day), timeout=config.OV_TIMEOUT_SECONDS)
-            response.raise_for_status()
-            items, skipped = oeffentlichevergabe.parse_export(response.content)
+            content, _ = _get(client, oeffentlichevergabe.export_url(day), config.OV_MAX_BYTES,
+                              timeout=config.OV_TIMEOUT_SECONDS)
+            items, skipped = oeffentlichevergabe.parse_export(content)
             with connect() as conn:
                 stats = upsert_items(conn, items, SOURCE_OV)
             _add(totals, stats)
@@ -267,9 +304,7 @@ def fetch_details(client: httpx.Client) -> tuple[int, list[str]]:
         if i:
             time.sleep(config.DETAIL_DELAY_SECONDS)
         try:
-            response = client.get(row["url"])
-            response.raise_for_status()
-            detail = parse_detail(row["url"], response.text)
+            detail = parse_detail(row["url"], fetch_detail_page(client, row["url"]))
             with connect() as conn:
                 if detail is None:
                     conn.execute("UPDATE tenders SET detail_status = 'keine' WHERE id = ?", (row["id"],))
