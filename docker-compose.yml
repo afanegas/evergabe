@@ -2,6 +2,9 @@
 # Alle persönlichen Werte (Domain, Passwort-Hash, SMTP) stehen in der .env – siehe .env.example.
 #
 # Start / Update:  git pull && docker compose up -d --build
+#
+# Der KI-Worker (zweiter Dienst unten) startet nur, wenn in der .env  COMPOSE_PROFILES=ki  steht.
+# Ohne diese Zeile läuft alles wie bisher.
 
 services:
   ev-checker:
@@ -21,6 +24,8 @@ services:
       - EVC_SMTP_FROM=${EVC_SMTP_FROM:-}
       - EVC_BACKUP_TIME=${EVC_BACKUP_TIME:-03:00}
       - EVC_BACKUP_KEEP=${EVC_BACKUP_KEEP:-14}
+      # leer = Schnittstelle für den KI-Worker abgeschaltet
+      - EVC_AI_TOKEN=${EVC_AI_TOKEN:-}
     volumes:
       - ./data:/data
 # Nicht aufmachen: ohne Traefik davor wäre die App ohne Passwort erreichbar (und Docker umgeht dabei
@@ -29,6 +34,7 @@ services:
 #      - 8765:8000
     networks:
       - traefik_proxy
+      - ki        # nur für den KI-Worker; ohne ihn bleibt das Netz leer
     restart: unless-stopped
     # ---------- Absicherung des Containers ----------
     # Obergrenze für den Arbeitsspeicher (der Tagesexport von oeffentlichevergabe.de und das
@@ -57,6 +63,7 @@ services:
       - "traefik.http.routers.ev-checker.tls=true"
       - "traefik.http.routers.ev-checker.tls.certresolver=le"
       - "traefik.http.routers.ev-checker.middlewares=ev-checker-auth,ev-checker-headers"
+      - "traefik.http.routers.ev-checker.service=ev-checker"
       - "traefik.http.middlewares.ev-checker-auth.basicauth.users=${EVC_BASIC_AUTH}"
       # HSTS: nur Traefik weiß von TLS, deshalb hier und nicht in der App. Ohne includeSubdomains,
       # damit andere Dienste auf Nachbar-Domains nicht betroffen sind.
@@ -64,7 +71,65 @@ services:
       - "traefik.http.middlewares.ev-checker-headers.headers.stsIncludeSubdomains=false"
       - "traefik.http.services.ev-checker.loadbalancer.server.port=8000"
       - "traefik.docker.network=traefik_proxy"
+      # Die Schnittstelle für den KI-Worker (/api/ki/…) ist von außen gesperrt: Der Worker spricht
+      # die App direkt im Netz „ki“ an, nicht über Traefik. Eigener Router mit höherem Vorrang, der
+      # nur Anfragen von 127.0.0.1 durchlässt – also von außen niemanden.
+      - "traefik.http.routers.ev-checker-ki.rule=Host(`${EVC_DOMAIN}`) && PathPrefix(`/api/ki`)"
+      - "traefik.http.routers.ev-checker-ki.priority=1000"
+      - "traefik.http.routers.ev-checker-ki.entrypoints=websecure"
+      - "traefik.http.routers.ev-checker-ki.tls=true"
+      - "traefik.http.routers.ev-checker-ki.tls.certresolver=le"
+      - "traefik.http.routers.ev-checker-ki.middlewares=ev-checker-ki-sperre"
+      - "traefik.http.routers.ev-checker-ki.service=ev-checker"
+      - "traefik.http.middlewares.ev-checker-ki-sperre.ipallowlist.sourcerange=127.0.0.1/32"
+
+  # ---------- KI-Worker (Stufe 2) ----------
+  # Holt offene Bewertungen bei der App ab, lässt sie von Claude Code beurteilen und schickt die
+  # Urteile zurück. Kein Traefik, keine Ports, kein Zugriff auf ./data – nur HTTP zur App.
+  ev-checker-ki:
+    build: ./worker
+    image: ev-checker-ki:local
+    container_name: ev-checker-ki
+    profiles: ["ki"]
+    depends_on:
+      - ev-checker
+    environment:
+      - TZ=Europe/Berlin
+      - EVC_URL=http://ev-checker:8000
+      - EVC_AI_TOKEN=${EVC_AI_TOKEN:-}
+      # Langzeit-Token aus  claude setup-token  (Claude-Abo nötig, gilt ein Jahr)
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-}
+    # Takt und Bremse: alle N Minuten ein Durchgang mit höchstens M Anfragen an Claude
+    command:
+      - python3
+      - /app/ki_worker.py
+      - --wiederholen
+      - "${KI_INTERVALL_MINUTEN:-60}"
+      - --runden
+      - "${KI_RUNDEN_JE_DURCHGANG:-4}"
+    volumes:
+      # Claude Code schreibt Einstellungen und Sitzungsdaten ins Heimatverzeichnis
+      - ki-home:/home/node
+    networks:
+      - ki
+    restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  ki-home:
 
 networks:
   traefik_proxy:
     external: true
+  # Eigenes Netz für App und Worker. Bewusst kein „internal“: Der Worker muss Claude im Internet
+  # erreichen.
+  ki:

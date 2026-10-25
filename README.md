@@ -50,6 +50,34 @@ docker compose up -d --build
 
 Datenbank-Änderungen (neue Spalten, neue Regel-Listen) übernimmt die App beim Start automatisch.
 
+### KI-Worker einschalten (optional)
+
+Der zweite Container `ev-checker-ki` bewertet die offenen Einträge der KI-Auswahl automatisch mit
+Claude Code. Er startet nur, wenn er in der `.env` eingeschaltet ist; ohne das ändert sich nichts.
+
+1. **Token für Claude Code** auf einem Rechner erzeugen, auf dem Claude Code angemeldet ist:
+   `claude setup-token`. Setzt ein Claude-Abo (Pro, Max, Team oder Enterprise) voraus, gilt ein Jahr und
+   wird nirgends gespeichert – sofort kopieren.
+2. **In die `.env`** auf dem Server eintragen (Vorlage in `.env.example`):
+   ```bash
+   COMPOSE_PROFILES=ki
+   EVC_AI_TOKEN=<openssl rand -hex 32>
+   CLAUDE_CODE_OAUTH_TOKEN=<Token aus Schritt 1>
+   ```
+3. **Starten:** `docker compose up -d --build` – baut beide Container.
+4. **Zusehen:** `docker compose logs -f ev-checker-ki`. Der Worker prüft alle 60 Minuten und stellt höchstens
+   4 Anfragen je Durchgang (`KI_INTERVALL_MINUTEN`, `KI_RUNDEN_JE_DURCHGANG`).
+5. In der App unter **Einstellungen → 🤖 KI-Auswahl** das Leistungsprofil eintragen und einschalten –
+   die Server-Datenbank ist eine andere als die lokale.
+
+Abschalten: `docker compose stop ev-checker-ki`, dauerhaft die Zeile `COMPOSE_PROFILES=ki` entfernen.
+
+Der Worker spricht die App direkt im Docker-Netz `ki` an, nicht über Traefik. Von außen ist `/api/ki/…`
+über einen eigenen Traefik-Router gesperrt (nur 127.0.0.1 erlaubt). Der Container ist schreibgeschützt
+bis auf sein Heimatverzeichnis (Volume `ki-home`, dort legt Claude Code seine Einstellungen ab), hat keine
+Ports, kein Traefik-Label und keinen Zugriff auf `./data`. Die Version von Claude Code ist im
+`worker/Dockerfile` fest eingetragen; ein Update ist eine Änderung an der Zeile `CLAUDE_CODE_VERSION`.
+
 ### Daten, Datensicherung, Wiederherstellung
 
 - Alle Daten liegen in `./data` (SQLite-Datenbank `ev-checker.db`). Für ein Server-Backup genügt dieser Ordner.
@@ -181,6 +209,36 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 | 🤖 KI | die KI den Eintrag am Leistungsprofil für passend hält (nur in der Betriebsart „dritte Prüfung“) |
 
 Einträge ohne CPV-Codes (Vergebene Aufträge, Vorinformationen) werden nur über Stichwörter bewertet.
+
+Für einen späteren Worker, der die Bewertung automatisch holt, gibt es zwei Schnittstellen. Sie sind nur
+erreichbar, wenn in der `.env` ein `EVC_AI_TOKEN` steht (sonst antworten sie mit 404), und erwarten ihn im
+Kopf der Anfrage als `X-EVC-Token`:
+
+| Adresse | Zweck |
+|---|---|
+| `GET /api/ki/offen?limit=N` | offene Einträge und den fertigen Prompt holen |
+| `POST /api/ki/ergebnis` | Urteile zurückgeben – als `{"antwort": "<Text der KI>"}` oder als Liste |
+
+Die Antwort wird genauso geprüft wie beim Einfügen von Hand; es gibt keinen zweiten Weg mit eigenen Fehlern.
+
+Dazu gehört das Skript `worker/ki_worker.py`. Es holt die offenen Einträge, lässt sie von Claude Code
+beurteilen und schickt die Urteile zurück – ohne Zugriff auf Datenbank oder Code der App:
+
+```powershell
+$env:EVC_AI_TOKEN = "…"
+python worker/ki_worker.py --trocken --runden 1    # Probelauf ohne Claude: antwortet „unklar“
+python worker/ki_worker.py --limit 25              # eine Runde mit Claude
+python worker/ki_worker.py                         # bis nichts mehr offen ist
+```
+
+Das Modell ist fest vorgegeben, Standard `claude-sonnet-5-5`; ändern mit `--model` oder `CLAUDE_MODEL`
+(z. B. `claude-haiku-5-5`). Ohne diese Vorgabe nähme Claude Code das gerade eingestellte Modell – im Test
+war das Opus 5.5, das teuerste.
+
+Claude läuft dabei ohne Werkzeuge (`--allowedTools ""`, `--permission-mode dontAsk`) in einem leeren
+Arbeitsverzeichnis: Die Ausschreibungstexte kommen ungeprüft aus dem Netz, und eine Anweisung darin soll
+nichts anrichten können. Auf der Detailseite steht später, woher ein Urteil stammt („claude-code“,
+„probelauf“ oder „Antwort von Hand eingefügt“).
 
 Die KI-Auswahl verhält sich anders als die beiden anderen Prüfungen, weil eine Bewertung Zeit und Geld kostet:
 Das Urteil wird gespeichert und bei einer Neu-Klassifizierung nur abgelesen, nie erneut erfragt. Bewertet wird ein

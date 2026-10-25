@@ -141,26 +141,32 @@ Stand: 13.09.2026 (Phase 1 fertig)
         Profil ändern, und wird nur auf Knopfdruck neu eingeholt
   - [x] Stufe 1 von Hand: Seite „🤖 KI-Auswahl“ zeigt den Prompt zum Kopieren, die Antwort wird als JSON eingefügt
   - [ ] **Stufe 2 automatisch: Worker mit Claude Code auf dem Server** (Plan)
-    - [ ] Zwei Endpunkte in der App: `GET /api/ki/offen` (Profil + Einträge + fertiger Prompt) und
+    - [x] Zwei Endpunkte in der App: `GET /api/ki/offen` (Einträge + fertiger Prompt) und
           `POST /api/ki/ergebnis` (dieselbe Auswertung wie das Formular). Zugang über ein Token aus
-          der `.env` (`EVC_AI_TOKEN`), erreichbar nur im Docker-Netz – nicht über Traefik
-    - [ ] Worker-Skript `worker/ki_worker.py`: offene Einträge holen, Claude Code im Kopfmodus
+          der `.env` (`EVC_AI_TOKEN`); ohne Token sind sie abgeschaltet
+    - [x] Auf dem Server nur im Docker-Netz erreichbar: eigenes Netz `ki`, von außen sperrt ein
+          Traefik-Router `/api/ki/…` (nur 127.0.0.1)
+    - [x] Worker-Skript `worker/ki_worker.py`: offene Einträge holen, Claude Code im Kopfmodus
           aufrufen (`claude -p --output-format json`, **ohne Werkzeuge**: `--allowedTools ""` und
-          `--permission-mode dontAsk`, leeres Arbeitsverzeichnis), Antwort validieren und
-          zurückschicken; Schleife bis nichts mehr offen ist oder das Tageslimit erreicht ist
-    - [ ] Probelauf-Schalter (`--trocken`): antwortet „unklar“ ohne Claude – damit ist die ganze
-          Strecke ohne Token und ohne Kosten testbar
-    - [ ] Eigener Container `ev-checker-ki` im selben Compose-Projekt: Node bzw. Claude-Binary,
-          beschreibbares HOME, `CLAUDE_CODE_OAUTH_TOKEN` aus der `.env`, kein Traefik-Label,
-          kein Zugriff auf das Projektverzeichnis
-    - [ ] Anstoß nach jedem Abruf (oder eigener Zeitplan). Eigene Obergrenze je Lauf und je Tag,
-          zusätzlich Stopp am Abo-Limit: Claude Code stellt der Statuszeile den Verbrauch des
-          5-Stunden- und 7-Tage-Fensters als Prozentwert bereit (`rate_limits.five_hour.used_percentage`,
-          `resets_at`) – über ein kleines Statuszeilen-Skript auslesen, bei einem einstellbaren Anteil
-          (z. B. 50 %) aufhören und erst nach `resets_at` weitermachen. Der Wert fehlt manchmal
-          (erst ab der ersten Antwort, nur bei Pro/Max) – dann greift die eigene Obergrenze.
-          Außerdem `/config autoContinueAtUsageLimit=false`, damit ein Lauf am Limit abbricht,
-          statt stundenlang zu warten
+          `--permission-mode dontAsk`, leeres Arbeitsverzeichnis), Antwort zurückschicken;
+          Schleife bis nichts mehr offen ist oder `--runden` erreicht ist
+    - [x] Probelauf-Schalter (`--trocken`): antwortet „unklar“ ohne Claude – damit ist die ganze
+          Strecke ohne Claude und ohne Verbrauch testbar
+    - [x] Eigener Container `ev-checker-ki` im selben Compose-Projekt (Profil `ki`, Schalter
+          `COMPOSE_PROFILES=ki` in der `.env`): Node 22 + Claude Code mit fester Version, HOME auf
+          dem Volume `ki-home`, `CLAUDE_CODE_OAUTH_TOKEN` aus der `.env`, kein Traefik-Label,
+          keine Ports, kein Zugriff auf `./data`
+    - [ ] **Auf dem Server zum ersten Mal bauen und starten** – lokal gibt es kein Docker; Bau,
+          Anmeldung mit dem Token und Erreichbarkeit der App sind noch nicht ausprobiert
+    - [ ] **Stopp am Abo-Limit.** Gemessen am 25.10.2026: Die Antwort von `claude -p --output-format json`
+          enthält `total_cost_usd` und `duration_ms`, aber **kein** `rate_limits` – der Prozentwert des
+          5-Stunden-Fensters steht nur der Statuszeile zur Verfügung. Der Worker liest ihn bereits aus,
+          falls er doch einmal da ist; für den echten Stopp bei z. B. 50 % braucht es ein kleines
+          Statuszeilen-Skript, das den Wert in eine Datei schreibt. Bis dahin bremsen `--runden` und
+          `--limit`. Außerdem `/config autoContinueAtUsageLimit=false`, damit ein Lauf am Limit
+          abbricht, statt stundenlang zu warten
+    - [x] Eigener Zeitplan: `--wiederholen` (Standard alle 60 Minuten, höchstens 4 Anfragen je
+          Durchgang); ein Fehler beendet nur den Durchgang, nicht den Dienst
     - [ ] Fehler sichtbar machen: `ai_state='fehler'`, `ai_error`, letzter Worker-Lauf in den
           Einstellungen; die Seite „KI-Auswahl“ bleibt als Rückfallebene von Hand bedienbar
     - [ ] Offen zu klären: Nutzungsgrenzen des Abos und ob automatisierter Serverbetrieb davon

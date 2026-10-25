@@ -1,5 +1,7 @@
+import json
 import logging
 import re
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from urllib.parse import urlencode
@@ -500,6 +502,71 @@ async def ai_apply(request: Request):
     if errors:
         return _ai_context(request, errors=errors, meldung=meldung)
     return _redirect(AI_PAGE, meldung=meldung)
+
+
+# ---------- Schnittstelle für den KI-Worker (Stufe 2) ----------
+#
+# Dieselben Funktionen wie die Seite /ki, nur ohne Formular: Der Worker holt die offenen Einträge
+# samt fertigem Prompt und schickt die Antwort zurück. Ausgewertet wird sie mit derselben Prüfung
+# wie beim Einfügen von Hand – es gibt keinen zweiten Weg mit eigenen Fehlern.
+
+def _check_ai_token(request: Request) -> None:
+    """Ohne Token in der .env gibt es die Schnittstelle nicht (404 statt 401, damit sie sich auch
+    nicht verrät). Mit Token muss er genau stimmen."""
+    if not config.AI_TOKEN:
+        raise HTTPException(404, "Schnittstelle nicht eingerichtet")
+    if not secrets.compare_digest(request.headers.get("x-evc-token", ""), config.AI_TOKEN):
+        raise HTTPException(401, "Token fehlt oder stimmt nicht")
+
+
+@app.get("/api/ki/offen")
+def ai_api_pending(request: Request, limit: int | None = None):
+    _check_ai_token(request)
+    values = settings.get_all()
+    if not values["ai_enabled"]:
+        return JSONResponse({"aktiv": False, "offen": 0, "eintraege": [], "prompt": ""})
+    if limit is not None:
+        limit = min(max(limit, 1), config.AI_MAX_PER_REQUEST)
+    items = ai.pending(limit=limit, values=values)
+    return JSONResponse({
+        "aktiv": True,
+        "modus": values["ai_mode"],
+        "offen": ai.open_count(values),
+        "eintraege": [{"id": item["id"], "titel": item["title"]} for item in items],
+        "prompt": ai.build_prompt(items, values["ai_profile"]) if items else "",
+    })
+
+
+@app.post("/api/ki/ergebnis")
+async def ai_api_results(request: Request):
+    """Nimmt die Antwort der KI entgegen – entweder als Rohtext ({"antwort": "…"}, so wie Claude sie
+    liefert) oder direkt als Liste von Urteilen."""
+    _check_ai_token(request)
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(400, "Der Rumpf der Anfrage ist kein gültiges JSON")
+    modell = "worker"
+    if isinstance(body, dict) and "antwort" in body:
+        roh = str(body["antwort"])
+        # Woher das Urteil stammt, steht später auf der Detailseite
+        modell = " ".join(str(body.get("modell") or "worker").split())[:40] or "worker"
+    elif isinstance(body, list):
+        roh = json.dumps(body, ensure_ascii=False)
+    else:
+        raise HTTPException(400, 'Erwartet wird {"antwort": "…"} oder eine Liste von Urteilen')
+
+    entries, errors = ai.parse_answer(roh)
+    result = ai.apply_results(entries, model=modell) if entries else {"saved": [], "unknown": []}
+    if result["saved"]:
+        fetcher.reclassify(result["saved"])
+    return JSONResponse({
+        "gespeichert": len(result["saved"]),
+        "ids": result["saved"],
+        "unbekannt": result["unknown"],
+        "fehler": errors,
+        "offen": ai.open_count(),
+    }, status_code=200 if entries else 400)
 
 
 @app.get("/eintrag/{tender_id}", response_class=HTMLResponse)

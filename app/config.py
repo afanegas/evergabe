@@ -50,6 +50,9 @@ REST_RETENTION_DAYS = 90
 # Beschreibungen sind fast immer Vergabe- und Formalienkram, der für die Frage nichts hergibt.
 AI_TEXT_MAX_CHARS = 1500
 
+# Obergrenze für ?limit= an /api/ki/offen – der Worker soll sich nicht beliebig viel auf einmal holen
+AI_MAX_PER_REQUEST = 200
+
 # ---------- Betrieb (Docker/Server) – alle Werte kommen aus Umgebungsvariablen bzw. der .env ----------
 
 # Öffentliche Adresse der App, z. B. https://evchecker.example.org – für Links in E-Mails
@@ -59,6 +62,10 @@ BASE_URL = os.environ.get("EVC_BASE_URL", "").rstrip("/")
 BACKUP_DIR = DATA_DIR / "backups"
 BACKUP_TIME = os.environ.get("EVC_BACKUP_TIME") or "03:00"
 BACKUP_KEEP = int(os.environ.get("EVC_BACKUP_KEEP") or 14)
+
+# Zugang für den KI-Worker (/api/ki/…). Ohne gesetzten Wert sind die beiden Schnittstellen
+# abgeschaltet – sie sollen nicht versehentlich offenstehen.
+AI_TOKEN = os.environ.get("EVC_AI_TOKEN", "")
 
 # E-Mail-Versand (Zugangsdaten nur über Umgebungsvariablen, nie in der Datenbank)
 SMTP_HOST = os.environ.get("EVC_SMTP_HOST", "")

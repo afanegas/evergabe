@@ -373,3 +373,69 @@ def test_saving_rules_answers_at_once_and_reclassifies_in_the_background(client,
         time.sleep(0.1)
     assert fetcher.reclassify_state["running"] is False
     assert fetcher.reclassify_state["counts"]["gesamt"] > 0
+
+
+# ---------- Schnittstelle für den Worker ----------
+
+KOPF = {"X-EVC-Token": "geheim"}
+
+
+@pytest.fixture
+def mit_token(monkeypatch):
+    monkeypatch.setattr(config, "AI_TOKEN", "geheim")
+
+
+def test_api_is_absent_without_a_token_in_the_env(client):
+    assert client.get("/api/ki/offen").status_code == 404
+    assert client.post("/api/ki/ergebnis", json=[]).status_code == 404
+
+
+def test_api_rejects_a_wrong_token(client, mit_token):
+    assert client.get("/api/ki/offen").status_code == 401
+    assert client.get("/api/ki/offen", headers={"X-EVC-Token": "falsch"}).status_code == 401
+    assert client.get("/api/ki/offen", headers=KOPF).status_code == 200
+
+
+def test_api_delivers_the_same_prompt_as_the_page(client, mit_token):
+    enable(AI_PRUEFUNG)  # damit mehr als ein Eintrag in Frage kommt
+    ai.mark_candidates()
+    daten = client.get("/api/ki/offen?limit=2", headers=KOPF).json()
+    assert daten["aktiv"] is True and daten["modus"] == AI_PRUEFUNG
+    assert len(daten["eintraege"]) == 2 and daten["offen"] >= 2
+    assert PROFIL in daten["prompt"]
+    assert str(daten["eintraege"][0]["id"]) in daten["prompt"]
+
+
+def test_api_reports_that_the_selection_is_switched_off(client, mit_token):
+    daten = client.get("/api/ki/offen", headers=KOPF).json()
+    assert daten == {"aktiv": False, "offen": 0, "eintraege": [], "prompt": ""}
+
+
+def test_api_accepts_raw_text_and_reclassifies(client, mit_token):
+    enable(AI_PRUEFUNG)
+    ai.mark_candidates()
+    tender_id = one(NICHT_INTERESSANT)
+    roh = f'```json\n[{{"id": {tender_id}, "interessant": true, "begruendung": "Energiekonzept"}}]\n```'
+    antwort = client.post("/api/ki/ergebnis", json={"antwort": roh}, headers=KOPF)
+    assert antwort.status_code == 200
+    assert antwort.json()["gespeichert"] == 1 and antwort.json()["ids"] == [tender_id]
+    assert field(tender_id, "ai_result", "auto_status") == ("treffer", INTERESSANT)
+
+
+def test_api_accepts_a_plain_list(client, mit_token):
+    enable(AI_MARKIERUNG)
+    tender_id = one(INTERESSANT)
+    antwort = client.post("/api/ki/ergebnis", headers=KOPF,
+                          json=[{"id": tender_id, "interessant": False, "begruendung": "Bauleistung"}])
+    assert antwort.status_code == 200
+    assert field(tender_id, "ai_result", "ai_match") == ("kein_treffer", 0)
+
+
+def test_api_reports_errors_and_unknown_numbers(client, mit_token):
+    enable(AI_MARKIERUNG)
+    kaputt = client.post("/api/ki/ergebnis", json={"antwort": "kein JSON"}, headers=KOPF)
+    assert kaputt.status_code == 400 and kaputt.json()["fehler"]
+    unbekannt = client.post("/api/ki/ergebnis", headers=KOPF,
+                            json=[{"id": 999999, "interessant": True, "begruendung": "gibt es nicht"}])
+    assert unbekannt.status_code == 200 and unbekannt.json() | {"offen": 0} == {
+        "gespeichert": 0, "ids": [], "unbekannt": [999999], "fehler": [], "offen": 0}
