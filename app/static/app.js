@@ -87,6 +87,27 @@
   setTimeout(poll, 1500);
 })();
 
+// Hinweis auf eine laufende Neu-Einstufung; ist sie fertig, die Seite einmal neu laden.
+(function () {
+  const banner = document.getElementById("reclassify-banner");
+  if (!banner || banner.hidden) return;
+
+  async function poll() {
+    try {
+      const res = await fetch("/api/status", { cache: "no-store" });
+      const s = await res.json();
+      if (s.reclassify && s.reclassify.running) { setTimeout(poll, 2000); return; }
+      // Fertig: neu laden, damit Einstufungen und Zähler stimmen (ohne die Meldung in der Adresse)
+      window.location.href = window.location.pathname
+        + window.location.search.replace(/([?&])meldung=[^&]*&?/, "$1").replace(/[?&]$/, "")
+        + window.location.hash;
+    } catch (e) {
+      setTimeout(poll, 5000);
+    }
+  }
+  setTimeout(poll, 2000);
+})();
+
 // Einstellungen: Regel-Listen (an/aus, hinzufügen, löschen). Gespeichert wird erst mit „Speichern“.
 (function () {
   const panels = document.querySelectorAll(".rule-panel");

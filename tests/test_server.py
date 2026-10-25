@@ -44,6 +44,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "BACKUP_DIR", tmp_path / "backups")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     monkeypatch.setattr(config, "SMTP_HOST", "smtp.example.org")
     monkeypatch.setattr(config, "SMTP_FROM", "evchecker@example.org")
     monkeypatch.setattr(config, "SMTP_USER", "evchecker@example.org")

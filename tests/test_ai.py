@@ -1,6 +1,8 @@
 """KI-Auswahl: Warteschlange, Antwort auswerten und Wirkung auf Markierung bzw. Einstufung."""
 
 import json
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     monkeypatch.setattr(tenders, "now", lambda: HEUTE)
     monkeypatch.setattr(ai, "now", lambda: HEUTE)  # auch die Altersgrenze rechnet mit der festen Uhr
     with TestClient(main.app) as c:
@@ -344,3 +348,28 @@ def test_saving_the_profile_alone_does_not_reclassify(client, monkeypatch):
     assert laeufe == []
     client.post("/einstellungen/ki", data={**daten, "ai_mode": AI_PRUEFUNG})  # Betriebsart wirkt
     assert len(laeufe) == 1
+
+
+def test_saving_rules_answers_at_once_and_reclassifies_in_the_background(client, monkeypatch):
+    """Die Seite soll nicht warten: Das Speichern antwortet sofort, die Neu-Einstufung läuft
+    danach weiter und meldet sich über /api/status."""
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", True)
+    langsam = threading.Event()
+    original = fetcher.reclassify_all
+    monkeypatch.setattr(fetcher, "reclassify_all", lambda *a, **k: (langsam.wait(5), original())[1])
+
+    antwort = client.post("/einstellungen/klassifizierung",
+                          data={"rules_form": "1", "keyword_enabled": "1", "rule-keyword-0-value": "Energie",
+                                "rule-keyword-0-active": "1"},
+                          follow_redirects=False)
+    assert antwort.status_code == 303  # sofort zurück, obwohl die Einstufung noch läuft
+    assert client.get("/api/status").json()["reclassify"]["running"] is True
+    assert "neu eingestuft" in client.get("/einstellungen").text  # Hinweis-Leiste steht auf der Seite
+
+    langsam.set()
+    for _ in range(100):
+        if not fetcher.reclassify_state["running"]:
+            break
+        time.sleep(0.1)
+    assert fetcher.reclassify_state["running"] is False
+    assert fetcher.reclassify_state["counts"]["gesamt"] > 0

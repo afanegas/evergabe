@@ -225,6 +225,7 @@ def fetch_berlin_feeds(client: httpx.Client, feeds, feed_status: dict) -> tuple[
             items = parse_feed(content, feed.key)
             with connect() as conn:
                 stats = upsert_items(conn, items, SOURCE_BERLIN)
+            reclassify(stats["ids"])  # je Feed sofort, damit ein Abbruch nichts liegen lässt
             _add(totals, stats)
             status.update(items=len(items), new=stats["new"])
             log.info("Feed %s: %d Einträge, %d neu", feed.key, len(items), stats["new"])
@@ -275,6 +276,9 @@ def fetch_oeffentlichevergabe(client: httpx.Client, last_day: str | None) -> tup
             items, skipped = oeffentlichevergabe.parse_export(content)
             with connect() as conn:
                 stats = upsert_items(conn, items, SOURCE_OV)
+            # Jeden Tag sofort einstufen: Bricht der Abruf ab (Netz, Neustart), bleibt höchstens
+            # dieser eine Tag uneingestuft – und uneingestuft hieße stillschweigend „nicht interessant“.
+            reclassify(stats["ids"])
             _add(totals, stats)
             status.update(items=status["items"] + len(items), new=totals["new"], merged=totals["merged"], day=day.isoformat())
             settings.set_many({"ov_last_day": day.isoformat()})
@@ -414,6 +418,52 @@ def reclassify_all(rules: Rules | None = None) -> dict:
     return reclassify(None, rules)
 
 
+def reclassify_pending() -> int:
+    """Einträge nachholen, die noch nie eingestuft wurden – etwa weil ein Abruf mitten im Import
+    abgebrochen ist (Netz weg, Neustart). Ohne Einstufung gelten sie stillschweigend als nicht
+    interessant und fallen niemandem auf. Erkennbar sind sie an cpv_result: Jede Einstufung setzt
+    die Spalte, auch bei abgeschalteter CPV-Prüfung („aus“)."""
+    with connect() as conn:
+        ids = [row[0] for row in conn.execute("SELECT id FROM tenders WHERE cpv_result IS NULL")]
+    if ids:
+        log.warning("%d Einträge ohne Einstufung gefunden – werden nachgeholt", len(ids))
+        reclassify(ids)
+    return len(ids)
+
+
+# Eine Neu-Einstufung geht über alle Einträge und dauert bei zehntausenden eine halbe Minute.
+# Nach dem Speichern von Einstellungen läuft sie deshalb im Hintergrund; die Seite kommt sofort
+# zurück und zeigt oben einen Hinweis, solange sie läuft (siehe /api/status).
+reclassify_state = {"running": False, "started_at": None, "finished_at": None, "counts": None}
+_reclassify_lock = threading.Lock()
+
+
+def _reclassify_job(trigger: str) -> None:
+    with _reclassify_lock:
+        try:
+            counts = reclassify_all()
+            reclassify_state["counts"] = counts
+            log.info("Neu-Einstufung (%s): %s", trigger, counts)
+        except Exception:
+            log.exception("Neu-Einstufung fehlgeschlagen")
+        finally:
+            reclassify_state.update(running=False, finished_at=now())
+
+
+def start_reclassify_in_background(trigger: str = "einstellungen") -> bool:
+    """Alle Einträge neu einstufen, ohne die Seite warten zu lassen.
+    Gibt False zurück, wenn schon eine Neu-Einstufung läuft."""
+    if not config.BACKGROUND_ENABLED:  # Tests: sofort erledigen, damit danach alles fertig ist
+        reclassify_state["counts"] = reclassify_all()
+        return True
+    if reclassify_state["running"]:
+        return False
+    # sofort sichtbar machen, damit die nächste Seite schon den Hinweis zeigt
+    reclassify_state.update(running=True, started_at=now(), finished_at=None, counts=None)
+    threading.Thread(target=_reclassify_job, args=(trigger,), daemon=True, name="reclassify").start()
+    return True
+
+
 def cleanup_rest() -> int:
     """Nicht interessante Einträge der Region „Rest“ nach REST_RETENTION_DAYS löschen –
     außer sie wurden manuell eingestuft, haben eine Notiz oder stammen von einem beobachteten Auftraggeber."""
@@ -455,21 +505,19 @@ def run_fetch(trigger: str = "zeitplan") -> bool:
                 stats, feed_errors = fetch_berlin_feeds(client, active_feeds, feed_status)
                 _add(totals, stats)
                 errors.extend(feed_errors)
-                reclassify(stats["ids"])  # neue Einträge sofort einstufen
 
             if SOURCE_OV not in values["feeds_disabled"]:
                 stats, status, ov_errors = fetch_oeffentlichevergabe(client, values.get("ov_last_day"))
                 _add(totals, stats)
                 errors.extend(ov_errors)
                 feed_status[SOURCE_OV] = track_failures(feed_status.get(SOURCE_OV), status)
-                state.update(phase="Klassifizierung", done=0, total=0)
-                reclassify(stats["ids"])
             settings.set_many({"feed_status": feed_status})
 
             details, detail_errors = fetch_details(client)
             errors.extend(detail_errors)
 
         state.update(phase="Aufräumen", done=0, total=0)
+        reclassify_pending()  # Netz für den Fall, dass doch einmal etwas liegen geblieben ist
         cleanup_rest()
 
         # Neue Einträge in die Warteschlange der KI-Auswahl stellen (bewertet wird erst auf der Seite /ki)

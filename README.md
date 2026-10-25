@@ -155,6 +155,10 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
   - CPV-Codes, Stichwörter, ★ wichtige Stichwörter, Ausschluss-Stichwörter als Listen: jeder Eintrag per Checkbox an/aus,
     „+ Hinzufügen“ (auch mit Enter) und × zum Löschen; „alle an / alle aus“. Änderungen werden gesammelt und mit
     „Speichern & neu klassifizieren“ übernommen. Abgeschaltete Einträge bleiben gespeichert, wirken aber nicht.
+    Das Neu-Einstufen geht über alle Einträge und dauert bei zehntausenden eine halbe Minute; es läuft deshalb
+    im Hintergrund. Die Seite kommt sofort zurück und zeigt oben einen Hinweis, bis es fertig ist – danach lädt
+    sie sich einmal neu. Beim Speichern der KI-Einstellungen passiert das nur, wenn sich Schalter oder
+    Betriebsart ändern: Profil, Regionen, Obergrenze und Höchstalter ändern die Einstufung nicht.
   - ↓ Niedrige Priorität: eigene Stichwort-Liste, ändert nichts an interessant / nicht interessant. Nur interessante
     Einträge (auch manuell eingestufte) werden als „↓ NIEDRIG“ markiert und in ihrer Gruppe nach unten sortiert.
     Einstellbar: prüfen nur im Titel (Standard) oder in Titel und Beschreibung; bei gleichzeitigem ★ wichtigem
@@ -209,6 +213,11 @@ Dubletten zwischen den Quellen werden über Titel und Auftraggeber erkannt. Dabe
 „Mobilität“ und „Mobilitaet“ als gleich – oeffentlichevergabe.de schreibt Umlaute teilweise aus, die
 Vergabeplattform Berlin nicht. Die Angleichung wirkt beim Abruf, bereits doppelt gespeicherte Einträge
 bleiben getrennt.
+
+Eingestuft wird direkt beim Abruf, und zwar je Feed bzw. je geladenem Tag. Bricht ein Abruf mittendrin ab
+(Netz weg, Neustart), bleibt höchstens ein Tag ohne Einstufung – und auch der wird beim nächsten Start der
+App und am Ende des nächsten Abrufs nachgeholt. Das ist wichtig, weil ein nicht eingestufter Eintrag
+stillschweigend als „nicht interessant“ gilt und sonst niemandem auffällt.
 
 Kann eine aktive Quelle 2× oder öfter hintereinander nicht abgerufen werden, zeigt jede Seite oben eine Warnung.
 

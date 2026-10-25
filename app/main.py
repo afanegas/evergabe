@@ -29,6 +29,8 @@ async def lifespan(app: FastAPI):
     seeded = settings.apply_rule_additions() or seeded
     if seeded:
         fetcher.reclassify_all()  # bestehende Einträge mit neu angelegten Stichwort-Listen markieren
+    else:
+        fetcher.reclassify_pending()  # nach einem abgebrochenen Abruf Liegengebliebenes nachholen
     if config.SCHEDULER_ENABLED:
         scheduler.start()
     yield
@@ -192,6 +194,7 @@ templates.env.globals.update(
     TREFFER_FILTERS=tenders.TREFFER_FILTERS,
     UNLABELLED_CATEGORIES=tenders.UNLABELLED_CATEGORIES,
     fetch_state=fetcher.state,
+    reclassify_state=fetcher.reclassify_state,
     cpv_code_hit=cpv_code_hit,
     cpv_rule_labels=cpv_rule_labels,
     cpv_title=cpv_title,
@@ -554,7 +557,8 @@ def health():
 
 @app.get("/api/status")
 def fetch_status():
-    return JSONResponse(fetcher.state)
+    """Laufender Abruf (oberste Ebene, wie bisher) und laufende Neu-Einstufung."""
+    return JSONResponse({**fetcher.state, "reclassify": fetcher.reclassify_state})
 
 
 @app.get("/api/cpv")
@@ -633,10 +637,10 @@ async def save_classification(request: Request):
         "priority_conflict": form.get("priority_conflict") if form.get("priority_conflict") in ("niedrig", "beide") else "wichtig",
     })
     settings.replace_rules(rules)
-    counts = fetcher.reclassify_all()
+    fetcher.start_reclassify_in_background("regeln")
     return _redirect(
         "/einstellungen",
-        meldung=f"Gespeichert – {counts['gesamt']} Einträge neu klassifiziert, davon {counts['interessant']} interessant.",
+        meldung="Gespeichert. Die Einträge werden im Hintergrund neu eingestuft – das dauert einen Moment.",
     )
 
 
@@ -656,16 +660,16 @@ async def save_ai(request: Request):
         return _settings_context(request, errors=errors, values={**settings.get_all(), **values})
     vorher = settings.get_all()
     settings.set_many(values)
-    counts = None
-    if _ai_classification_key(vorher) != _ai_classification_key({**vorher, **values}):
-        counts = fetcher.reclassify_all()
+    neu_einstufen = _ai_classification_key(vorher) != _ai_classification_key({**vorher, **values})
+    if neu_einstufen:
+        fetcher.start_reclassify_in_background("ki-einstellungen")
     queued = ai.mark_candidates()
     if not values["ai_enabled"]:
         meldung = "KI-Einstellungen gespeichert – die KI-Auswahl ist ausgeschaltet."
     else:
         meldung = f"KI-Einstellungen gespeichert – {queued} Einträge warten auf eine Bewertung."
-        if counts:
-            meldung += f" {counts['gesamt']} Einträge wurden neu klassifiziert."
+    if neu_einstufen:
+        meldung += " Die Einträge werden im Hintergrund neu eingestuft."
     return _redirect("/einstellungen#ki", meldung=meldung)
 
 

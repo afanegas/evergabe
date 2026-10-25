@@ -43,6 +43,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     # Die Fixtures haben feste Veröffentlichungsdaten – die Altersgrenze der Mail darf hier nicht greifen
     monkeypatch.setattr(config, "MAIL_MAX_AGE_DAYS", 36500)
     monkeypatch.setattr(tenders, "now", lambda: HEUTE)

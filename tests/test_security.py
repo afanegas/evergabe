@@ -24,6 +24,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     with TestClient(main.app) as c:
         yield c
 

@@ -16,6 +16,10 @@ DETAIL_MAX_ATTEMPTS = 3
 # Für Tests: kein Zeitplan und kein automatischer Abruf beim Start
 SCHEDULER_ENABLED = os.environ.get("EVC_DISABLE_SCHEDULER") != "1"
 
+# Für Tests: Hintergrundarbeiten (Neu-Einstufung nach dem Speichern) sofort im selben Aufruf
+# erledigen, statt einen Thread zu starten
+BACKGROUND_ENABLED = os.environ.get("EVC_DISABLE_BACKGROUND") != "1"
+
 # Die Feeds enthalten nur die letzten 50 Einträge (Bekanntmachungen ≈ 5 Tage).
 # Größere Abstände zwischen zwei Abrufen können Einträge verlieren.
 MAX_SAFE_GAP_HOURS = 48

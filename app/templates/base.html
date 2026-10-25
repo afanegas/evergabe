@@ -27,6 +27,12 @@
     <span id="fetch-text">Abruf läuft{% if fetch_state.phase %} – {{ fetch_state.phase }}{% endif %}{% if fetch_state.total %} ({{ fetch_state.done }}/{{ fetch_state.total }}){% endif %}</span>
   </div>
 
+  <div id="reclassify-banner" class="banner banner-info" {% if not reclassify_state.running %}hidden{% endif %}>
+    <span class="spinner"></span>
+    <span>Die Einträge werden neu eingestuft. Bis das fertig ist, können Listen und Zahlen noch den
+      alten Stand zeigen – die Seite lädt sich dann von selbst neu.</span>
+  </div>
+
   <main class="container">
     {% set warnings = source_warnings() %}
     {% if warnings %}

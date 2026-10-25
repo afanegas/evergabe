@@ -39,6 +39,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     monkeypatch.setattr(tenders, "now", lambda: HEUTE)
     with TestClient(main.app) as c:
         for name, category in [("bekanntmachungen", "bekanntmachung"), ("info-19-20", "vergeben")]:
@@ -335,6 +337,8 @@ def test_rule_migrations_on_start(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "old.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    # Neu-Einstufung sofort statt im Hintergrund, damit sie nach dem Speichern fertig ist
+    monkeypatch.setattr(config, "BACKGROUND_ENABLED", False)
     init_db()
     settings.seed_rules()
     settings.seed_priority_rules()
@@ -541,3 +545,21 @@ def test_cpv_add_field_searches_the_catalog(client):
     html = client.get("/einstellungen").text
     assert 'list="cpv-katalog"' in html and '<datalist id="cpv-katalog">' in html
     assert "Bezeichnung (optional)" not in html  # keine freie Texteingabe mehr
+
+
+def test_entries_from_an_interrupted_fetch_are_classified_later(client):
+    """Ein Abruf kann mitten im Import abbrechen (Netz weg, Neustart). Die schon gespeicherten
+    Einträge dürfen dann nicht stillschweigend als „nicht interessant“ liegen bleiben."""
+    items = parse_feed((FIXTURES / "info-19.rss").read_bytes(), "beschraenkt")
+    with connect() as conn:  # upsert ohne anschließende Einstufung = Abbruch an dieser Stelle
+        stats = fetcher.upsert_items(conn, items)
+        offen = conn.execute(
+            f"SELECT COUNT(*) FROM tenders WHERE cpv_result IS NULL AND id IN "
+            f"({', '.join('?' * len(stats['ids']))})", list(stats["ids"])
+        ).fetchone()[0]
+    assert offen == len(stats["ids"]) > 0  # noch keiner eingestuft
+
+    assert fetcher.reclassify_pending() == offen
+    with connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM tenders WHERE cpv_result IS NULL").fetchone()[0] == 0
+    assert fetcher.reclassify_pending() == 0  # beim zweiten Mal gibt es nichts mehr zu tun

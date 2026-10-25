@@ -153,7 +153,14 @@ Stand: 13.09.2026 (Phase 1 fertig)
     - [ ] Eigener Container `ev-checker-ki` im selben Compose-Projekt: Node bzw. Claude-Binary,
           beschreibbares HOME, `CLAUDE_CODE_OAUTH_TOKEN` aus der `.env`, kein Traefik-Label,
           kein Zugriff auf das Projektverzeichnis
-    - [ ] Anstoß nach jedem Abruf (oder eigener Zeitplan), Tageslimit gegen Abo-Grenzen
+    - [ ] Anstoß nach jedem Abruf (oder eigener Zeitplan). Eigene Obergrenze je Lauf und je Tag,
+          zusätzlich Stopp am Abo-Limit: Claude Code stellt der Statuszeile den Verbrauch des
+          5-Stunden- und 7-Tage-Fensters als Prozentwert bereit (`rate_limits.five_hour.used_percentage`,
+          `resets_at`) – über ein kleines Statuszeilen-Skript auslesen, bei einem einstellbaren Anteil
+          (z. B. 50 %) aufhören und erst nach `resets_at` weitermachen. Der Wert fehlt manchmal
+          (erst ab der ersten Antwort, nur bei Pro/Max) – dann greift die eigene Obergrenze.
+          Außerdem `/config autoContinueAtUsageLimit=false`, damit ein Lauf am Limit abbricht,
+          statt stundenlang zu warten
     - [ ] Fehler sichtbar machen: `ai_state='fehler'`, `ai_error`, letzter Worker-Lauf in den
           Einstellungen; die Seite „KI-Auswahl“ bleibt als Rückfallebene von Hand bedienbar
     - [ ] Offen zu klären: Nutzungsgrenzen des Abos und ob automatisierter Serverbetrieb davon
