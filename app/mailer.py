@@ -88,7 +88,8 @@ def published_cutoff(started: str) -> str:
 # zählt ersatzweise der Zeitpunkt, an dem der eV-Checker den Eintrag zuerst gesehen hat.
 _PUBLISHED_SQL = "substr(COALESCE(NULLIF(published_at, ''), NULLIF(online_since, ''), first_seen), 1, 10)"
 _NEW_SQL = f"first_seen > ? AND {_PUBLISHED_SQL} >= ?"
-_ORDER_SQL = "ORDER BY priority_level DESC, deadline IS NULL, deadline ASC, id"
+# Wie in der Liste: KI-Treffer zuerst, dann wichtig, dann nach Frist
+_ORDER_SQL = "ORDER BY ai_match DESC, priority_level DESC, deadline IS NULL, deadline ASC, id"
 
 
 def collect(since: str, published_from: str = "") -> list[dict]:
@@ -139,10 +140,12 @@ def build_message(
             regions.append({"label": region.label, "items": shown, "more": len(region_items) - len(shown)})
 
     important = sum(1 for i in items if i["important"])
+    ai_hits = sum(1 for i in items if i.get("ai_match"))
     if items:
         subject = f"eV-Checker: {len(items)} neue interessante Treffer"
-        if important:
-            subject += f" ({important} wichtig)"
+        details = [f"{important} wichtig"] * bool(important) + [f"{ai_hits} KI-Auswahl"] * bool(ai_hits)
+        if details:
+            subject += f" ({', '.join(details)})"
         if favorite_count:
             subject += f", {favorite_count} von beobachteten Auftraggebern"
     else:
@@ -156,6 +159,7 @@ def build_message(
         "favorite_count": favorite_count,
         "total": len(items),
         "important": important,
+        "ai_hits": ai_hits,
         "base_url": config.BASE_URL,
         "test": test,
         "CATEGORY_SHORT": CATEGORY_SHORT,

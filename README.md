@@ -65,8 +65,15 @@ Claude Code. Er startet nur, wenn er in der `.env` eingeschaltet ist; ohne das �
    CLAUDE_CODE_OAUTH_TOKEN=<Token aus Schritt 1>
    ```
 3. **Starten:** `docker compose up -d --build` – baut beide Container.
-4. **Zusehen:** `docker compose logs -f ev-checker-ki`. Der Worker prüft alle 60 Minuten und stellt höchstens
-   4 Anfragen je Durchgang (`KI_INTERVALL_MINUTEN`, `KI_RUNDEN_JE_DURCHGANG`).
+4. **Zusehen:** `docker compose logs -f ev-checker-ki`. Der Worker sieht alle 5 Minuten nach und stellt höchstens
+   4 Anfragen je Durchgang (`KI_INTERVALL_MINUTEN`, `KI_RUNDEN_JE_DURCHGANG`). Das Nachsehen kostet nichts;
+   Claude wird nur gerufen, wenn etwas offen ist – praktisch kurz nach jedem Abruf. Ins Protokoll schreibt
+   er nur, wenn er etwas bewertet hat.
+
+   **Tägliche Mail:** Läuft der Worker und sind zur Mail-Uhrzeit noch Bewertungen offen (meist vom Abruf
+   kurz vorher), wartet die Mail in 5-Minuten-Schritten, höchstens 30 Minuten, und geht danach trotzdem raus.
+   Hat sich der Worker seit 15 Minuten nicht gemeldet, wartet sie gar nicht. KI-Treffer stehen in der Mail
+   oben in jeder Region, mit „🤖 KI“ und der Begründung.
 5. In der App unter **Einstellungen → 🤖 KI-Auswahl** das Leistungsprofil eintragen und einschalten –
    die Server-Datenbank ist eine andere als die lokale.
 

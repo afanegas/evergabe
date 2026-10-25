@@ -168,6 +168,34 @@ def pending(limit: int | None = None, values: dict | None = None) -> list[dict]:
     return [row_to_dict(row) for row in rows]
 
 
+# Wann sich der Worker zuletzt gemeldet hat (GET /api/ki/offen). Nur im Arbeitsspeicher: Nach einem
+# Neustart der App gilt er bis zur nächsten Nachfrage – spätestens nach ein paar Minuten – als still.
+worker_state = {"last_seen": None}
+
+
+def worker_seen() -> None:
+    worker_state["last_seen"] = now()
+
+
+def worker_active() -> bool:
+    """Hat sich der Worker in den letzten Minuten gemeldet?"""
+    last = worker_state["last_seen"]
+    if not last:
+        return False
+    alter = datetime.fromisoformat(now()) - datetime.fromisoformat(last)
+    return alter <= timedelta(minutes=config.AI_WORKER_ACTIVE_MINUTES)
+
+
+def mail_should_wait(values: dict | None = None) -> int:
+    """Wie viele Bewertungen die tägliche Mail noch abwarten sollte – 0, wenn sie gleich raus kann.
+    Gewartet wird nur, wenn der Worker auch wirklich läuft: Wer von Hand bewertet, bekommt seine
+    Mail pünktlich."""
+    values = values or settings.get_all()
+    if not values["ai_enabled"] or not config.AI_TOKEN or not worker_active():
+        return 0
+    return open_count(values)
+
+
 def open_count(values: dict | None = None) -> int:
     """Offene Bewertungen – dieselbe Zahl wie auf der Seite, steht im Menü auf jeder Seite."""
     values = values or settings.get_all()

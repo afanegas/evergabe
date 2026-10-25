@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app import ai, config, fetcher, main, settings, tenders
+from app import ai, config, fetcher, mailer, main, scheduler, settings, tenders
 from app.classify import AI_MARKIERUNG, AI_PRUEFUNG, INTERESSANT, NICHT_INTERESSANT
 from app.db import connect
 from app.sources.berlin import parse_feed
@@ -439,3 +439,79 @@ def test_api_reports_errors_and_unknown_numbers(client, mit_token):
                             json=[{"id": 999999, "interessant": True, "begruendung": "gibt es nicht"}])
     assert unbekannt.status_code == 200 and unbekannt.json() | {"offen": 0} == {
         "gespeichert": 0, "ids": [], "unbekannt": [999999], "fehler": [], "offen": 0}
+
+
+# ---------- Tägliche Mail und KI-Worker ----------
+
+def test_mail_marks_ai_hits_first_with_reason(client):
+    enable(AI_MARKIERUNG)
+    with connect() as conn:  # ein zweiter interessanter Eintrag, damit die Reihenfolge etwas zeigt
+        conn.execute("INSERT OR IGNORE INTO rules(kind, value) VALUES('keyword', 'Glasfaser')")
+    fetcher.reclassify_all()
+    with connect() as conn:
+        ids = [r[0] for r in conn.execute(
+            "SELECT id FROM tenders WHERE auto_status = 'interessant' ORDER BY id DESC")]
+    assert len(ids) >= 2
+    judge(ids[0], reason="Energiekonzept für Schulen")  # der „letzte“ wird KI-Treffer
+    eintraege = mailer.collect("2000-01-01T00:00:00", "2000-01-01")
+    assert eintraege[0]["id"] == ids[0]  # KI-Treffer steht oben
+
+    nachricht = mailer.build_message(eintraege, ["a@example.org"])
+    assert "1 KI-Auswahl" in nachricht["Subject"]
+    text = nachricht.get_body(("plain",)).get_content()
+    html = nachricht.get_body(("html",)).get_content()
+    assert "[KI]" in text and "KI: Energiekonzept für Schulen" in text
+    assert "🤖 KI" in html and "Energiekonzept für Schulen" in html
+
+
+def test_mail_waits_only_for_a_worker_that_reports_in(client, monkeypatch):
+    enable(AI_PRUEFUNG)
+    ai.mark_candidates()
+    monkeypatch.setattr(ai, "worker_state", {"last_seen": None})
+    monkeypatch.setattr(config, "AI_TOKEN", "geheim")
+    assert ai.mail_should_wait() == 0  # Worker hat sich nie gemeldet → pünktlich verschicken
+
+    client.get("/api/ki/offen", headers={"X-EVC-Token": "geheim"})  # Worker fragt nach
+    assert ai.mail_should_wait() == ai.open_count() > 0
+
+    monkeypatch.setattr(config, "AI_TOKEN", "")  # ohne Token gibt es keinen Worker
+    assert ai.mail_should_wait() == 0
+
+
+class FakeScheduler:
+    def __init__(self):
+        self.jobs = []
+
+    def add_job(self, func, trigger, **kwargs):
+        self.jobs.append(kwargs)
+
+
+def test_daily_mail_waits_and_then_goes_out_anyway(monkeypatch):
+    uhr = {"jetzt": "2026-10-26T07:30:00"}
+    versandt = []
+    fake = FakeScheduler()
+    monkeypatch.setattr(scheduler, "_scheduler", fake)
+    monkeypatch.setattr(scheduler, "now", lambda: uhr["jetzt"])
+    monkeypatch.setattr(scheduler.mailer, "run_digest", lambda: versandt.append(uhr["jetzt"]) or {"sent": True})
+    monkeypatch.setattr(scheduler.ai, "mail_should_wait", lambda: 7)  # 7 Bewertungen offen
+
+    scheduler._run_digest()  # 7:30 – wartet
+    assert versandt == [] and fake.jobs[-1]["kwargs"] == {"geplant": "2026-10-26T07:30:00"}
+
+    uhr["jetzt"] = "2026-10-26T07:55:00"
+    scheduler._run_digest(geplant="2026-10-26T07:30:00")  # nach 25 Minuten – wartet noch
+    assert versandt == []
+
+    uhr["jetzt"] = "2026-10-26T08:00:00"
+    scheduler._run_digest(geplant="2026-10-26T07:30:00")  # nach 30 Minuten – geht trotzdem raus
+    assert versandt == ["2026-10-26T08:00:00"]
+
+
+def test_daily_mail_goes_out_at_once_when_nothing_is_open(monkeypatch):
+    versandt = []
+    fake = FakeScheduler()
+    monkeypatch.setattr(scheduler, "_scheduler", fake)
+    monkeypatch.setattr(scheduler.mailer, "run_digest", lambda: versandt.append(1) or {"sent": True})
+    monkeypatch.setattr(scheduler.ai, "mail_should_wait", lambda: 0)
+    scheduler._run_digest()
+    assert versandt == [1] and fake.jobs == []

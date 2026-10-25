@@ -53,6 +53,14 @@ AI_TEXT_MAX_CHARS = 1500
 # Obergrenze für ?limit= an /api/ki/offen – der Worker soll sich nicht beliebig viel auf einmal holen
 AI_MAX_PER_REQUEST = 200
 
+# Der Worker fragt alle paar Minuten nach. Hat er sich so lange nicht gemeldet, gilt er als nicht in
+# Betrieb – dann wartet die tägliche Mail auch nicht auf ihn.
+AI_WORKER_ACTIVE_MINUTES = 15
+# So lange wartet die tägliche Mail höchstens auf offene KI-Bewertungen, und in diesem Abstand sieht sie
+# nach. Danach geht sie trotzdem raus, damit ein hängender Worker nie die Mail blockiert.
+MAIL_WAIT_FOR_AI_MINUTES = 30
+MAIL_WAIT_STEP_MINUTES = 5
+
 # ---------- Betrieb (Docker/Server) – alle Werte kommen aus Umgebungsvariablen bzw. der .env ----------
 
 # Öffentliche Adresse der App, z. B. https://evchecker.example.org – für Links in E-Mails

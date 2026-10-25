@@ -201,15 +201,17 @@ def main(argv: list[str] | None = None) -> int:
         while True:
             # Ein Fehler (App nicht erreichbar, Claude am Limit) beendet nur diesen Durchgang;
             # der Dienst läuft weiter und versucht es beim nächsten Mal erneut.
-            durchgang(args)
+            durchgang(args, leise=True)
             time.sleep(args.wiederholen * 60)
     except KeyboardInterrupt:
         log.warning("Beendet.")
         return 0
 
 
-def durchgang(args) -> int:
-    """Ein Durchgang: Runden, bis nichts mehr offen ist oder --runden erreicht ist."""
+def durchgang(args, leise: bool = False) -> int:
+    """Ein Durchgang: Runden, bis nichts mehr offen ist oder --runden erreicht ist.
+    `leise`: im Dauerbetrieb nichts melden, wenn es nichts zu tun gab – sonst stünde alle paar
+    Minuten dieselbe Zeile im Protokoll."""
     basis = args.url.rstrip("/")
     bewertet = 0
     try:
@@ -219,7 +221,8 @@ def durchgang(args) -> int:
             gelaufen += 1
             bewertet += ergebnis["bewertet"]
             if ergebnis["bewertet"] == 0:
-                log.info("Nichts mehr zu bewerten.")
+                if not leise:
+                    log.info("Nichts mehr zu bewerten.")
                 break
             if ergebnis["offen"] == 0:
                 break
@@ -229,7 +232,8 @@ def durchgang(args) -> int:
     except KeyboardInterrupt:
         log.warning("Abgebrochen.")
         return 1
-    log.info("Fertig: %d Urteile in diesem Durchgang.", bewertet)
+    if bewertet or not leise:
+        log.info("Fertig: %d Urteile in diesem Durchgang.", bewertet)
     return 0
 
 

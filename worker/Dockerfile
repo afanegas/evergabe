@@ -31,5 +31,6 @@ COPY ki_worker.py .
 # Einstellungen nach /home/node – das liegt in docker-compose.yml auf einem eigenen Volume.
 USER node
 
-# Dauerbetrieb; Takt und Obergrenzen setzt docker-compose.yml
-CMD ["python3", "/app/ki_worker.py", "--wiederholen", "60", "--runden", "4"]
+# Alle 5 Minuten nachsehen: Das Nachfragen kostet nichts, Claude wird nur gerufen, wenn wirklich
+# etwas offen ist. So ist der Abruf um 7:00 bewertet, bevor um 7:30 die Mail rausgeht.
+CMD ["python3", "/app/ki_worker.py", "--wiederholen", "5", "--runden", "4"]

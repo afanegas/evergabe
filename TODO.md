@@ -165,15 +165,17 @@ Stand: 13.09.2026 (Phase 1 fertig)
           Statuszeilen-Skript, das den Wert in eine Datei schreibt. Bis dahin bremsen `--runden` und
           `--limit`. Außerdem `/config autoContinueAtUsageLimit=false`, damit ein Lauf am Limit
           abbricht, statt stundenlang zu warten
-    - [x] Eigener Zeitplan: `--wiederholen` (Standard alle 60 Minuten, höchstens 4 Anfragen je
-          Durchgang); ein Fehler beendet nur den Durchgang, nicht den Dienst
+    - [x] Eigener Zeitplan: `--wiederholen` (Standard alle 5 Minuten nachsehen, höchstens 4 Anfragen
+          je Durchgang); ein Fehler beendet nur den Durchgang, nicht den Dienst
+    - [x] Tägliche Mail wartet bis zu 30 Minuten auf offene KI-Bewertungen – nur, wenn sich der Worker
+          in den letzten 15 Minuten gemeldet hat
     - [ ] Fehler sichtbar machen: `ai_state='fehler'`, `ai_error`, letzter Worker-Lauf in den
           Einstellungen; die Seite „KI-Auswahl“ bleibt als Rückfallebene von Hand bedienbar
     - [ ] Offen zu klären: Nutzungsgrenzen des Abos und ob automatisierter Serverbetrieb davon
           gedeckt ist; Token läuft ab und muss erneuert werden
   - [ ] Stufe 3: Anthropic-API als austauschbares Backend (Einstellung `ai_backend`) – ein HTTP-Aufruf
         statt Agent, deterministisches Schema, Kosten im Cent-Bereich je Monat
-  - [ ] KI-Treffer in der täglichen E-Mail kennzeichnen
+  - [x] KI-Treffer in der täglichen E-Mail kennzeichnen (oben in jeder Region, mit Begründung)
 - [ ] Bearbeitungsstatus (in Prüfung / Angebot abgegeben / abgesagt / gewonnen)
 
 ## Start-Regeln (in der App anpassbar)

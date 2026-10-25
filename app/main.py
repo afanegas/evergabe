@@ -522,6 +522,7 @@ def _check_ai_token(request: Request) -> None:
 @app.get("/api/ki/offen")
 def ai_api_pending(request: Request, limit: int | None = None):
     _check_ai_token(request)
+    ai.worker_seen()  # die tägliche Mail wartet nur auf einen Worker, der sich auch meldet
     values = settings.get_all()
     if not values["ai_enabled"]:
         return JSONResponse({"aktiv": False, "offen": 0, "eintraege": [], "prompt": ""})

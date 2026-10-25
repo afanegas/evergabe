@@ -100,12 +100,13 @@ services:
       # Langzeit-Token aus  claude setup-token  (Claude-Abo nötig, gilt ein Jahr)
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-}
-    # Takt und Bremse: alle N Minuten ein Durchgang mit höchstens M Anfragen an Claude
+    # Takt und Bremse: alle N Minuten nachsehen, je Durchgang höchstens M Anfragen an Claude.
+    # Nachsehen kostet nichts – Claude wird nur gerufen, wenn etwas offen ist.
     command:
       - python3
       - /app/ki_worker.py
       - --wiederholen
-      - "${KI_INTERVALL_MINUTEN:-60}"
+      - "${KI_INTERVALL_MINUTEN:-5}"
       - --runden
       - "${KI_RUNDEN_JE_DURCHGANG:-4}"
     volumes:

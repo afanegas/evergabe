@@ -5,9 +5,10 @@ from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import backup, config, mailer, settings
+from . import ai, backup, config, mailer, settings
 from .db import connect, now
 from .fetcher import run_fetch, start_fetch_in_background
 
@@ -36,7 +37,22 @@ def _cron(time_str: str) -> CronTrigger:
     return CronTrigger(hour=int(hour), minute=int(minute))
 
 
-def _run_digest() -> None:
+def _run_digest(geplant: str | None = None) -> None:
+    """Tägliche Mail. Läuft der KI-Worker und sind noch Bewertungen offen (meist vom Abruf kurz
+    vorher), wartet sie in kleinen Schritten, höchstens MAIL_WAIT_FOR_AI_MINUTES lang – sonst stünden
+    die KI-Treffer erst in der Mail von morgen oder, bei „dritte Prüfung“, nie. Danach geht sie
+    trotzdem raus, damit ein hängender Worker nie die Mail blockiert."""
+    geplant = geplant or now()
+    offen = ai.mail_should_wait()
+    gewartet = datetime.fromisoformat(now()) - datetime.fromisoformat(geplant)
+    if offen and gewartet < timedelta(minutes=config.MAIL_WAIT_FOR_AI_MINUTES) and _scheduler is not None:
+        log.info("Tägliche E-Mail wartet auf die KI-Auswahl: %d Bewertungen offen", offen)
+        nochmal = datetime.fromisoformat(now()) + timedelta(minutes=config.MAIL_WAIT_STEP_MINUTES)
+        _scheduler.add_job(_run_digest, DateTrigger(run_date=nochmal, timezone=config.TIMEZONE),
+                           id="mail-warten", replace_existing=True, kwargs={"geplant": geplant})
+        return
+    if offen:
+        log.warning("Tägliche E-Mail geht ohne %d offene KI-Bewertungen raus – Wartezeit abgelaufen", offen)
     result = mailer.run_digest()
     log.info("Tägliche E-Mail: %s", result)
 
