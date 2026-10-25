@@ -1,4 +1,4 @@
-{% from "_macros.html" import status_badge, hits, deadline, source_badges %}
+{% from "_macros.html" import status_badge, hits, deadline, authority_link %}
 {% set cpv_labels = cpv_rule_labels() %}
 {% set group_url = current_url ~ '#gruppe-' ~ g.key %}
 {% if g["items"] %}
@@ -25,9 +25,10 @@
           <a href="/eintrag/{{ item.id }}?zurueck={{ group_url | urlencode }}">{{ item.title }}</a>
         </div>
         <div class="sub">
-          <span class="cat cat-{{ item.category }}">{{ CATEGORY_SHORT[item.category] }}</span>
-          {{ source_badges(item) }}
-          {% if item.authority %}<span>{{ item.authority }}</span>{% endif %}
+          {% if item.category not in UNLABELLED_CATEGORIES %}
+            <span class="cat cat-{{ item.category }}">{{ CATEGORY_SHORT[item.category] }}</span>
+          {% endif %}
+          {% if item.authority %}{{ authority_link(item.authority) }}{% endif %}
           {% if item.procedure %}<span class="muted">{{ item.procedure }}</span>{% endif %}
           {% if item.contractor %}<span>→ {{ item.contractor }}</span>{% endif %}
         </div>

@@ -133,7 +133,7 @@
 
     if (kind === "cpv") {
       const m = value.match(/^(\d{8})(?:-\d)?$/);
-      if (!m) { showError(panel, "CPV-Code: 8 Ziffern, z. B. 71314000"); valueInput.focus(); return; }
+      if (!m) { showError(panel, "Bitte einen Eintrag aus der CPV-Liste wählen."); valueInput.focus(); return; }
       value = m[1];
     } else {
       // kombinierte Stichwörter einheitlich schreiben: „Konzept+Energie“ -> „Konzept + Energie“
@@ -178,6 +178,8 @@
 
     valueInput.value = "";
     if (labelInput) labelInput.value = "";
+    const titelAnzeige = panel.querySelector(".rule-add-title");
+    if (titelAnzeige) titelAnzeige.textContent = "";
     valueInput.focus();
     updateCount(panel);
     markDirty();
@@ -238,3 +240,50 @@ document.addEventListener("submit", function (event) {
   const message = form && form.dataset ? form.dataset.confirm : "";
   if (message && !window.confirm(message)) event.preventDefault();
 });
+
+// Einstellungen: CPV-Codes im amtlichen Katalog suchen. Die Bezeichnung wird nicht getippt, sondern
+// gehört zum gewählten Code – so können Code und Titel nicht auseinanderlaufen.
+(function () {
+  const panel = document.querySelector('.rule-panel[data-kind="cpv"]');
+  if (!panel) return;
+  const feld = panel.querySelector(".rule-add-value");
+  const liste = panel.querySelector("#cpv-katalog");
+  const label = panel.querySelector(".rule-add-label");
+  const titel = panel.querySelector(".rule-add-title");
+  if (!feld || !liste || !label || !titel) return;
+
+  let treffer = [];
+  let timer = null;
+
+  function uebernehmen() {
+    const code = (feld.value.match(/\d{8}/) || [""])[0];
+    const gefunden = treffer.find(function (t) { return t.code === code; });
+    label.value = gefunden ? gefunden.title : "";
+    titel.textContent = gefunden ? gefunden.title : "";
+  }
+
+  function suchen() {
+    const begriff = feld.value.trim();
+    if (begriff.length < 2) { liste.replaceChildren(); treffer = []; uebernehmen(); return; }
+    fetch("/api/cpv?q=" + encodeURIComponent(begriff), { headers: { "X-Requested-With": "fetch" } })
+      .then(function (res) { return res.ok ? res.json() : []; })
+      .then(function (daten) {
+        treffer = daten;
+        liste.replaceChildren.apply(liste, daten.map(function (t) {
+          const option = document.createElement("option");
+          option.value = t.code;
+          option.label = t.title;
+          option.textContent = t.title;
+          return option;
+        }));
+        uebernehmen();
+      })
+      .catch(function () { /* die Suche ist eine Hilfe, kein Muss */ });
+  }
+
+  feld.addEventListener("input", function () {
+    uebernehmen();
+    clearTimeout(timer);
+    timer = setTimeout(suchen, 200);
+  });
+})();

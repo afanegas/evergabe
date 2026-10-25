@@ -5,12 +5,15 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, fetcher, mailer, main, settings
+from app import config, fetcher, mailer, main, settings, tenders
 from app.db import connect
 from app.sources.berlin import parse_feed
 from app.sources.details import parse_rib
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Feste Uhr, damit die Fristen der Fixtures nicht irgendwann ablaufen (siehe test_app.py)
+HEUTE = "2026-09-01T08:00:00"
 
 
 class FakeSMTP:
@@ -42,6 +45,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
     # Die Fixtures haben feste Veröffentlichungsdaten – die Altersgrenze der Mail darf hier nicht greifen
     monkeypatch.setattr(config, "MAIL_MAX_AGE_DAYS", 36500)
+    monkeypatch.setattr(tenders, "now", lambda: HEUTE)
     with TestClient(main.app) as c:
         items = parse_feed((FIXTURES / "bekanntmachungen.rss").read_bytes(), "bekanntmachung")
         items += parse_feed((FIXTURES / "info-19-20.rss").read_bytes(), "vergeben")
@@ -101,8 +105,9 @@ def test_watch_from_detail_page_marks_entries(client):
     assert row["favorite"] == 1 and "GESOBAU" in row["authority_matches"]
 
     assert "♥ beobachtet" in client.get("/eintrag/1").text
-    list_html = client.get("/?status=alle").text
-    assert 'class="pill-fav"' in list_html
+    # Eintrag 1 ist durch das Öffnen gesehen – der Standard „nur neue“ zeigt ihn darum nicht mehr
+    assert 'class="pill-fav"' not in client.get("/?status=alle").text
+    assert 'class="pill-fav"' in client.get("/?status=alle&neu=0").text
 
     # nochmal beobachten legt kein Duplikat an
     watch(client, "gesobau")
@@ -118,7 +123,9 @@ def test_favorites_page_grouped_by_authority_default_all(client):
     html = client.get("/auftraggeber").text
     assert 'class="tab active" href="/auftraggeber?status=alle' in html  # Standard-Reiter „Alle“
     assert html.index("♥ GESOBAU") < html.index("♥ Bezirksamt Mitte")
-    assert "Gefundene Namen: GESOBAU AG" in html
+    # Gefundene Namen als Link auf die Suche nach dieser Vergabestelle (Reiter „Alle“, neuer Tab)
+    assert 'href="/?status=alle&amp;vergabestelle=GESOBAU%20AG"' in html
+    assert 'target="_blank"' in html and "GESOBAU AG</a>" in html
     assert "Rahmenvertrag Schädlingsbekämpfung 2026" in html  # nicht interessant, aber sichtbar
 
     interesting = client.get("/auftraggeber?status=interessant").text
@@ -188,3 +195,21 @@ def test_mail_has_favorites_section(client, monkeypatch):
         .get_body(("html",)).get_content()
     assert 'href="https://evchecker.example.org/auftraggeber"' in html
     assert "nicht interessant" in message.get_body(("plain",)).get_content()
+
+
+def test_mark_seen_on_favorites_page_spares_the_rest(client):
+    """Auf dem Reiter „♥ Auftraggeber“ werden nur beobachtete Einträge abgehakt."""
+    watch(client, "GESOBAU")
+    with connect() as conn:
+        watched = conn.execute("SELECT COUNT(*) FROM tenders WHERE favorite = 1").fetchone()[0]
+    assert watched
+
+    client.post(
+        "/gesehen",
+        data={"next": "/auftraggeber", "status": "alle", "frist": "alle", "favoriten": "1"},
+        follow_redirects=False,
+    )
+    with connect() as conn:
+        seen_others = conn.execute("SELECT COUNT(*) FROM tenders WHERE seen_at IS NOT NULL AND favorite = 0").fetchone()[0]
+        still_new = conn.execute("SELECT COUNT(*) FROM tenders WHERE seen_at IS NULL AND favorite = 1").fetchone()[0]
+    assert (seen_others, still_new) == (0, 0)

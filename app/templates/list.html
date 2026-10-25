@@ -5,13 +5,18 @@
 {% block content %}
 {% include "_list_head.html" %}
 
-{% if not overview.last_run and not total %}
+{% if not overview.entries %}
 <div class="empty">
   {% if fetch_state.running %}
     Der erste Abruf läuft – die Liste füllt sich gleich.
   {% else %}
     Noch keine Daten. Klicke oben auf „Jetzt abrufen“.
   {% endif %}
+</div>
+{% elif filters.neu and not total %}
+<div class="empty">
+  <p><strong>Nichts Neues.</strong> Alles in dieser Ansicht ist gesehen.</p>
+  <p><a href="{{ show_seen_url }}">auch gesehene anzeigen</a></p>
 </div>
 {% else %}
 

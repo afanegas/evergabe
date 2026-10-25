@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import backup, classify, config, fetcher, mailer, scheduler, settings, tenders
+from . import backup, classify, config, cpv, fetcher, mailer, scheduler, settings, tenders
 from .db import init_db, now
 from .categories import CATEGORY_LABELS, CATEGORY_SHORT, REGION_LABELS, SOURCE_LABELS, SOURCE_OV
 from .sources.berlin import FEEDS, Feed
@@ -130,6 +130,26 @@ def cpv_rule_labels() -> dict[str, str]:
     return {r["value"]: r["label"] for r in settings.list_rules("cpv") if r["label"]}
 
 
+def cpv_title(item: dict, code: str, rule_labels: dict[str, str] | None = None) -> str:
+    """Bezeichnung zu einem CPV-Code – überall dort, wo ein Code angezeigt wird, in dieser Reihenfolge:
+    Angabe der Quelle am Eintrag, eigene Bezeichnung aus der CPV-Liste, offizieller CPV-Katalog und
+    zuletzt die Bezeichnung eines kürzeren Listen-Codes, der diesen Code abdeckt."""
+    wanted = classify.cpv_digits(code)
+    for entry in item.get("cpv_codes") or []:
+        if entry.get("label") and classify.cpv_digits(entry.get("code", "")) == wanted:
+            return entry["label"]
+    labels = cpv_rule_labels() if rule_labels is None else rule_labels
+    if labels.get(code):
+        return labels[code]
+    amtlich = cpv.title(code)
+    if amtlich:
+        return amtlich
+    for rule_code in classify.match_cpv([code], list(labels)):
+        if labels.get(rule_code):
+            return labels[rule_code]
+    return ""
+
+
 def source_warnings() -> list[dict]:
     """Aktive Quellen, die mehrmals hintereinander nicht abgerufen werden konnten (Banner auf allen Seiten)."""
     values = settings.get_all()
@@ -168,9 +188,13 @@ templates.env.globals.update(
     CATEGORY_SHORT=CATEGORY_SHORT,
     REGION_LABELS=REGION_LABELS,
     SOURCE_LABELS=SOURCE_LABELS,
+    SEARCH_FIELD_LABELS=tenders.SEARCH_FIELD_LABELS,
+    UNLABELLED_CATEGORIES=tenders.UNLABELLED_CATEGORIES,
     fetch_state=fetcher.state,
     cpv_code_hit=cpv_code_hit,
     cpv_rule_labels=cpv_rule_labels,
+    cpv_title=cpv_title,
+    cpv_katalog=cpv.title,
     source_warnings=source_warnings,
     run_duration=run_duration,
     asset=asset,
@@ -200,16 +224,20 @@ def _redirect(url: str, **params) -> RedirectResponse:
 
 # ---------- Liste ----------
 
-def _filters_from(params: dict, default_status: str = "interessant") -> tenders.Filters:
+def _filters_from(params: dict, default_status: str = "interessant", default_neu: bool = True) -> tenders.Filters:
+    """Filter aus den Parametern der Seite. `neu` ist im Ausschreibungsbereich voreingestellt: Das Formular
+    schickt darum immer einen Wert mit (0 oder 1), sonst wäre „Haken raus“ nicht von „nichts gewählt“
+    zu unterscheiden."""
     return tenders.Filters(
         status=params.get("status", default_status),
         kategorie=params.get("kategorie", ""),
         quelle=params.get("quelle", ""),
         q=params.get("q", "").strip(),
+        suchfeld=params.get("suchfeld", ""),
         vergabestelle=params.get("vergabestelle", "").strip(),
         treffer=params.get("treffer", ""),
         frist=params.get("frist", ""),
-        neu=bool(params.get("neu")),
+        neu=params.get("neu", "1" if default_neu else "") == "1",
         sort=params.get("sort", "neueste"),
     )
 
@@ -253,7 +281,12 @@ def _page_context(params: dict, filters: tenders.Filters, page: str, **extra) ->
         "overview": tenders.overview(),
         "page_url": page,
         "base_query": urlencode(tab_params),
+        "view_params": tab_params,
+        "favorites_only": page == FAVORITES_PAGE,
         "current_url": page + (f"?{urlencode(params)}" if params else ""),
+        "show_seen_url": page + "?" + urlencode(
+            {**{k: v for k, v in params.items() if not k.startswith("anzahl_")}, "status": filters.status, "neu": "0"}
+        ),
         "show_expired_url": page + "?" + urlencode(
             {**{k: v for k, v in params.items() if not k.startswith("anzahl_")}, "status": filters.status, "frist": "alle"}
         ),
@@ -285,6 +318,7 @@ def list_view(request: Request, meldung: str = ""):
             params, filters, "/",
             regions=regions,
             total=sum(r["total"] for r in regions),
+            new_total=sum(r["new"] for r in regions),
             counts=tenders.status_counts(filters),
             expired_hidden=tenders.expired_hidden(filters),
             meldung=meldung,
@@ -317,7 +351,7 @@ FAVORITES_PAGE = "/auftraggeber"
 @app.get(FAVORITES_PAGE, response_class=HTMLResponse)
 def favorites_view(request: Request, meldung: str = ""):
     params = {k: v for k, v in request.query_params.items() if k != "meldung"}
-    filters = _filters_from(params, default_status="alle")
+    filters = _filters_from(params, default_status="alle", default_neu=False)
     base_query = urlencode({k: v for k, v in params.items() if not k.startswith("anzahl_")})
     patterns = settings.load_favorites()
 
@@ -336,6 +370,7 @@ def favorites_view(request: Request, meldung: str = ""):
         _page_context(
             params, filters, FAVORITES_PAGE,
             blocks=blocks,
+            new_total=sum(b["new"] for b in blocks),
             total=tenders.status_counts(filters, favorites_only=True)[filters.status if filters.status in ("interessant", "nicht_interessant") else "alle"],
             counts=tenders.status_counts(filters, favorites_only=True),
             expired_hidden=tenders.expired_hidden(filters, favorites_only=True),
@@ -352,7 +387,8 @@ def favorites_group_partial(request: Request, group_key: str, ag: str = ""):
         raise HTTPException(404, "Gruppe nicht gefunden")
     params = {k: v for k, v in request.query_params.items() if k != "ag"}
     g = {"group": group, "key": f"{tenders.favorite_key(ag)}-{group.key}"}
-    _load_group(_filters_from(params, default_status="alle"), params, g, favorite_pattern=ag, page=FAVORITES_PAGE)
+    _load_group(_filters_from(params, default_status="alle", default_neu=False), params, g,
+                favorite_pattern=ag, page=FAVORITES_PAGE)
     return templates.TemplateResponse(
         request,
         "_group_body.html",
@@ -380,9 +416,17 @@ async def unwatch_authority(request: Request):
 
 
 @app.post("/gesehen")
-def mark_all_seen(next: str = Form("/")):
-    tenders.mark_seen()
-    return _redirect(_safe_next(next))
+async def mark_view_seen(request: Request):
+    """Nur die Einträge der abgeschickten Ansicht als gesehen markieren – das Formular schickt die
+    Filter der Seite mit, damit andere Reiter, Regionen und Gruppen unberührt bleiben."""
+    form = await request.form()
+    params = {k: v for k, v in form.items() if k not in ("next", "favoriten")}
+    favorites_only = bool(form.get("favoriten"))
+    filters = _filters_from(params, default_status="alle" if favorites_only else "interessant",
+                            default_neu=not favorites_only)
+    count = tenders.mark_seen_view(filters, favorites_only=favorites_only)
+    meldung = "1 Eintrag als gesehen markiert" if count == 1 else f"{count} Einträge als gesehen markiert"
+    return _redirect(_safe_next(form.get("next")), meldung=meldung)
 
 
 # ---------- Detail ----------
@@ -445,6 +489,12 @@ def fetch_status():
     return JSONResponse(fetcher.state)
 
 
+@app.get("/api/cpv")
+def cpv_suggestions(q: str = ""):
+    """Vorschläge für das CPV-Feld der Einstellungen: Code und amtliche Bezeichnung gehören zusammen."""
+    return JSONResponse(cpv.search(q))
+
+
 # ---------- Einstellungen ----------
 
 def _settings_context(request: Request, **extra) -> HTMLResponse:
@@ -474,6 +524,7 @@ def _settings_context(request: Request, **extra) -> HTMLResponse:
         "next_runs": scheduler.next_runs(),
         "runs": fetcher.last_runs(),
         "smtp_summary": mailer.smtp_summary(),
+        "mail_recipients": mailer.parse_recipients(values["mail_to"])[0],
         "mail_next_run": scheduler.next_run("mail"),
         "mail_lookback_days": config.MAIL_MAX_LOOKBACK_DAYS,
         "mail_max_age_days": config.MAIL_MAX_AGE_DAYS,
@@ -550,7 +601,8 @@ def save_mail(
     settings.set_many({"mail_enabled": bool(mail_enabled), "mail_to": ", ".join(recipients), "mail_time": times[0]})
     scheduler.apply_schedule()
     hint = "" if mailer.smtp_configured() or not mail_enabled else " Achtung: SMTP ist noch nicht konfiguriert (.env)."
-    return _redirect("/einstellungen#mail", meldung="E-Mail-Einstellungen gespeichert." + hint)
+    wer = "1 Empfänger" if len(recipients) == 1 else f"{len(recipients)} Empfänger"
+    return _redirect("/einstellungen#mail", meldung=f"E-Mail-Einstellungen gespeichert ({wer})." + hint)
 
 
 @app.post("/einstellungen/mail/test")

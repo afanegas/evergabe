@@ -135,6 +135,10 @@ tbody tr:hover { background: #fbfaf7; }
 .status-cell { white-space: nowrap; }
 .status-cell form { display: block; margin-top: 0.25rem; }
 
+/* Auftraggeber: Link auf die Suche nach dieser Vergabestelle */
+.authority-search { color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.authority-search:hover { color: inherit; border-bottom-style: solid; }
+
 .pill-fav { color: #b3261e; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
 .authority-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; }
 .authority-line form { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -275,6 +279,8 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
 .rule-add { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .rule-add input { flex: 1 1 8rem; min-width: 0; }
 .rule-add .narrow-code { flex: 0 1 7.5rem; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+/* Bezeichnung des gewählten CPV-Codes neben dem Suchfeld */
+.rule-add-title { flex: 1 1 100%; font-size: 0.85rem; min-height: 1.2em; }
 .save-bar {
   position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;
   flex-wrap: wrap; margin: 0.75rem -1.2rem 0; padding: 0.7rem 1.2rem; background: var(--warn-soft); color: var(--warn);

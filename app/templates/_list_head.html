@@ -19,7 +19,12 @@
 
 <form class="filters" method="get" action="{{ page_url }}">
   <input type="hidden" name="status" value="{{ filters.status }}">
-  <input type="search" name="q" value="{{ filters.q }}" placeholder="Suche in Titel, Beschreibung, CPV …" class="grow">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Suchbegriff …" class="grow">
+  <select name="suchfeld" title="Suchbereich" aria-label="Suche in">
+    {% for key, label in SEARCH_FIELD_LABELS.items() %}
+      <option value="{{ key }}" {% if filters.suchfeld == key %}selected{% endif %}>suche {{ label }}</option>
+    {% endfor %}
+  </select>
   <select name="kategorie">
     <option value="">Alle Kategorien</option>
     {% for key, label in CATEGORY_LABELS.items() %}
@@ -55,6 +60,9 @@
     <option value="frist" {% if filters.sort == 'frist' %}selected{% endif %}>Frist aufsteigend</option>
     <option value="titel" {% if filters.sort == 'titel' %}selected{% endif %}>Titel A–Z</option>
   </select>
+  {# Verstecktes Feld davor: ohne es käme beim abgewählten Haken gar kein Wert an und der Standard
+     „nur neue“ würde wieder greifen #}
+  <input type="hidden" name="neu" value="0">
   <label class="check"><input type="checkbox" name="neu" value="1" {% if filters.neu %}checked{% endif %}> nur neue</label>
   <button type="submit" class="btn">Filtern</button>
   <a href="{{ page_url }}?status={{ filters.status }}" class="btn btn-ghost">Zurücksetzen</a>
@@ -63,15 +71,27 @@
 <div class="list-actions">
   <span class="muted">
     {{ total }} Einträge
+    {% if filters.neu %}
+      · nur neue – <a href="{{ show_seen_url }}">auch gesehene anzeigen</a>
+    {% endif %}
     {% if expired_hidden %}
       · {{ expired_hidden }} mit abgelaufener Frist ausgeblendet –
       <a href="{{ show_expired_url }}">anzeigen</a>
     {% endif %}
   </span>
-  {% if overview.unseen_interesting %}
+  {% if new_total %}
+    {# Die Filter der Seite gehen mit, damit nur diese Ansicht als gesehen gilt #}
     <form method="post" action="/gesehen">
       <input type="hidden" name="next" value="{{ current_url }}">
-      <button class="btn btn-ghost btn-sm" type="submit">Alle als gesehen markieren</button>
+      <input type="hidden" name="status" value="{{ filters.status }}">
+      {% for key, value in view_params.items() %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endfor %}
+      {% if favorites_only %}<input type="hidden" name="favoriten" value="1">{% endif %}
+      <button class="btn btn-ghost btn-sm" type="submit"
+              title="Markiert nur die {{ new_total }} neuen Einträge dieser Ansicht">
+        Diese Ansicht als gesehen markieren
+      </button>
     </form>
   {% endif %}
 </div>

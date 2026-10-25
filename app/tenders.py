@@ -10,6 +10,23 @@ from .db import connect, now, row_to_dict
 STATUS_SQL = "COALESCE(manual_status, auto_status)"
 
 # In jeder Gruppe zuerst nach Priorität (wichtig oben, niedrig unten), dann nach der gewählten Sortierung
+# Suchbereich: welche Spalten der Suchbegriff durchsucht. "" ist der Standard – alles, was früher
+# fest eingebaut war.
+SEARCH_FIELDS = {
+    "": ("title", "subject", "service_type", "description", "authority", "contractor", "cpv_codes"),
+    "titel": ("title",),
+    "beschreibung": ("description", "subject", "service_type"),
+    "auftraggeber": ("authority", "contractor"),
+    "cpv": ("cpv_codes",),
+}
+SEARCH_FIELD_LABELS = {
+    "": "überall",
+    "titel": "nur Titel",
+    "beschreibung": "nur Beschreibung",
+    "auftraggeber": "nur Auftraggeber",
+    "cpv": "nur CPV-Code",
+}
+
 SORTS = {
     "neueste": "COALESCE(published_at, first_seen) DESC",
     "frist": "deadline IS NULL, deadline ASC",
@@ -30,6 +47,11 @@ class Group:
     label: str
     categories: tuple[str, ...]
     open_by_default: bool
+
+
+# Kategorien, die in der Listenzeile nicht genannt werden: „Bekanntmachung“ ist der Normalfall und steht
+# bei fast jedem Eintrag – alle übrigen Kategorien bleiben in der Zeile sichtbar.
+UNLABELLED_CATEGORIES = ("bekanntmachung",)
 
 
 # Reihenfolge = Reihenfolge in der Liste; weniger wichtige Regionen/Gruppen stehen unten und sind zugeklappt
@@ -53,10 +75,11 @@ class Filters:
     kategorie: str = ""
     quelle: str = ""  # berlin | oeffentlichevergabe
     q: str = ""
+    suchfeld: str = ""  # Suchbereich, siehe SEARCH_FIELDS
     vergabestelle: str = ""
     treffer: str = ""  # cpv | stichwort | wichtig | niedrig | favorit | manuell
     frist: str = ""  # "" = abgelaufene ausblenden (Standard) | offen = nur mit offener Frist | alle
-    neu: bool = False
+    neu: bool = False  # nur ungesehene Einträge; im Ausschreibungsbereich der Standard
     sort: str = "neueste"
 
 
@@ -107,7 +130,7 @@ def _where(
         params.append(filters.quelle)
     if filters.q:
         like = f"%{filters.q}%"
-        cols = ("title", "subject", "service_type", "description", "authority", "contractor", "cpv_codes")
+        cols = SEARCH_FIELDS.get(filters.suchfeld, SEARCH_FIELDS[""])
         clauses.append("(" + " OR ".join(f"{c} LIKE ?" for c in cols) + ")")
         params.extend([like] * len(cols))
     if filters.vergabestelle:
@@ -280,9 +303,7 @@ def status_counts(filters: Filters, favorites_only: bool = False) -> dict:
 
 def overview() -> dict:
     with connect() as conn:
-        unseen = conn.execute(
-            f"SELECT COUNT(*) FROM tenders WHERE seen_at IS NULL AND {STATUS_SQL} = 'interessant'"
-        ).fetchone()[0]
+        entries = conn.execute("SELECT COUNT(*) FROM tenders").fetchone()[0]
         last = conn.execute("SELECT * FROM fetch_runs WHERE finished_at IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
         authorities = [
             r[0] for r in conn.execute(
@@ -291,7 +312,7 @@ def overview() -> dict:
                 "ORDER BY authority COLLATE NOCASE"
             )
         ]
-    return {"unseen_interesting": unseen, "last_run": dict(last) if last else None, "authorities": authorities}
+    return {"entries": entries, "last_run": dict(last) if last else None, "authorities": authorities}
 
 
 def source_counts() -> dict[str, int]:
@@ -318,14 +339,23 @@ def get(tender_id: int) -> dict | None:
     return item
 
 
-def mark_seen(tender_ids: list[int] | None = None) -> None:
+def mark_seen(tender_ids: list[int]) -> None:
     with connect() as conn:
-        if tender_ids is None:
-            conn.execute("UPDATE tenders SET seen_at = ? WHERE seen_at IS NULL", (now(),))
-        else:
-            conn.executemany(
-                "UPDATE tenders SET seen_at = ? WHERE id = ? AND seen_at IS NULL", [(now(), i) for i in tender_ids]
-            )
+        conn.executemany(
+            "UPDATE tenders SET seen_at = ? WHERE id = ? AND seen_at IS NULL", [(now(), i) for i in tender_ids]
+        )
+
+
+def mark_seen_view(filters: Filters, favorites_only: bool = False) -> int:
+    """Die ungesehenen Einträge der aktuellen Ansicht als gesehen markieren (Reiter und Filter wie angezeigt,
+    abgelaufene Fristen bleiben beim Standardfilter also unberührt). Gibt die Anzahl zurück."""
+    where, params = _where(filters)
+    clauses = ["seen_at IS NULL"]
+    if favorites_only:
+        clauses.append("favorite = 1")
+    condition = where + (" AND " if where else " WHERE ") + " AND ".join(clauses)
+    with connect() as conn:
+        return conn.execute(f"UPDATE tenders SET seen_at = ?{condition}", [now(), *params]).rowcount
 
 
 def set_manual_status(tender_id: int, status: str | None) -> None:

@@ -33,6 +33,13 @@
   {% endif %}
 {%- endmacro %}
 
+{% macro authority_link(name) -%}
+  {# Suche nach dieser Vergabestelle im Ausschreibungsbereich, Reiter „Alle“ – in einem neuen Tab #}
+  <a class="authority-search" target="_blank" rel="noopener"
+     href="/?status=alle&amp;vergabestelle={{ name | urlencode }}"
+     title="Alle Einträge von „{{ name }}“ suchen (neuer Tab)">{{ name }}</a>
+{%- endmacro %}
+
 {% macro source_badges(item) -%}
   {% for s in item.sources or [] %}
     <span class="src src-{{ s.source }}" title="Quelle: {{ SOURCE_LABELS[s.source] }}">{{ SOURCE_LABELS[s.source] }}</span>
@@ -45,7 +52,7 @@
   {% if item.cpv_matches or item.keyword_matches or lowprio %}
     <div class="hits">
       {% for code in item.cpv_matches %}
-        {% set label = cpv_labels.get(code) %}
+        {% set label = cpv_title(item, code, cpv_labels) %}
         <span class="chip chip-cpv" title="CPV {{ code }}{% if label %} – {{ label }}{% endif %}">{{ code }}{% if label %} <span class="chip-label">{{ label }}</span>{% endif %}</span>
       {% endfor %}
       {% for k in item.keyword_matches %}

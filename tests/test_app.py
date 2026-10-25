@@ -4,12 +4,16 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, fetcher, main
+from app import config, fetcher, main, tenders
 from app.db import connect
 from app.sources.berlin import parse_feed
 from app.sources.details import parse_rib
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Die Fixtures haben feste Fristen (früheste 03.09.2026). Ohne feste Uhr würden sie mit der Zeit
+# alle ablaufen und vom Standardfilter ausgeblendet – die Tests hängen sonst am Tagesdatum.
+HEUTE = "2026-09-01T08:00:00"
 
 
 def rules_form(cpv=(), keyword=(), priority=(), exclusion=(), lowprio=(), inactive=(), **options) -> dict:
@@ -35,6 +39,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setattr(config, "SCHEDULER_ENABLED", False)
+    monkeypatch.setattr(tenders, "now", lambda: HEUTE)
     with TestClient(main.app) as c:
         for name, category in [("bekanntmachungen", "bekanntmachung"), ("info-19-20", "vergeben")]:
             items = parse_feed((FIXTURES / f"{name}.rss").read_bytes(), category)
@@ -102,7 +107,9 @@ def test_list_is_grouped_by_region_then_group(client):
     assert "Trinkwasseruntersuchungen" not in vergeben
     partial = client.get("/gruppe/berlin/vergeben?status=alle").text
     assert "Trinkwasseruntersuchungen" in partial
-    assert "Vergabeplattform Berlin" in partial  # Quelle sichtbar
+    # Die Quelle steht nicht mehr in der Zeile, nur noch auf der Detailseite
+    assert "Vergabeplattform Berlin" not in partial
+    assert "Vergabeplattform Berlin" in client.get("/eintrag/51").text
     # Kategorie-Filter zeigt nur die passende Gruppe, aufgeklappt
     html = client.get("/?status=alle&kategorie=vergeben").text
     assert 'id="gruppe-berlin-ausschreibungen"' not in html
@@ -344,3 +351,192 @@ def test_rule_migrations_on_start(tmp_path, monkeypatch):
     with TestClient(main.app):
         pass
     assert "Energiemanagementsystem" not in [r["value"] for r in settings.list_rules("priority")]
+
+
+# ---------- „Diese Ansicht als gesehen markieren“ ----------
+
+def status_counts_from_db(where: str = "1") -> dict:
+    with connect() as conn:
+        return {
+            row[0]: row[1] for row in conn.execute(
+                f"SELECT COALESCE(manual_status, auto_status), COUNT(*) FROM tenders WHERE {where} GROUP BY 1"
+            )
+        }
+
+
+def test_mark_seen_keeps_other_tab_new(client):
+    """Der Reiter wird mitgeschickt: „Interessant“ abhaken lässt „Nicht interessant“ neu."""
+    total = status_counts_from_db()
+    assert total.get("interessant") and total.get("nicht_interessant")
+
+    client.post("/gesehen", data={"next": "/", "status": "interessant", "frist": "alle"}, follow_redirects=False)
+    assert status_counts_from_db("seen_at IS NOT NULL") == {"interessant": total["interessant"]}
+
+    client.post("/gesehen", data={"next": "/", "status": "nicht_interessant", "frist": "alle"}, follow_redirects=False)
+    assert status_counts_from_db("seen_at IS NULL") == {}
+
+
+def test_mark_seen_respects_filters(client):
+    with connect() as conn:
+        conn.execute("UPDATE tenders SET auto_status = 'interessant', manual_status = NULL, deadline = NULL")
+        titles = [r[0] for r in conn.execute("SELECT title FROM tenders ORDER BY id LIMIT 2")]
+        conn.execute("UPDATE tenders SET authority = 'Teststelle Berlin' WHERE title = ?", (titles[0],))
+
+    response = client.post(
+        "/gesehen", data={"next": "/", "status": "interessant", "vergabestelle": "Teststelle"}, follow_redirects=False
+    )
+    assert response.status_code == 303 and "meldung=1+Eintrag" in response.headers["location"]
+    with connect() as conn:
+        seen = [r[0] for r in conn.execute("SELECT title FROM tenders WHERE seen_at IS NOT NULL")]
+    assert seen == [titles[0]]
+
+
+def test_mark_seen_leaves_expired_entries_new(client):
+    """Beim Standardfilter sind abgelaufene Fristen ausgeblendet – also werden sie auch nicht abgehakt."""
+    with connect() as conn:
+        conn.execute("UPDATE tenders SET auto_status = 'interessant', manual_status = NULL, deadline = NULL")
+        expired = conn.execute("SELECT id FROM tenders ORDER BY id LIMIT 1").fetchone()[0]
+        conn.execute("UPDATE tenders SET deadline = '2000-01-01' WHERE id = ?", (expired,))
+
+    client.post("/gesehen", data={"next": "/", "status": "interessant"}, follow_redirects=False)
+    with connect() as conn:
+        still_new = [r[0] for r in conn.execute("SELECT id FROM tenders WHERE seen_at IS NULL")]
+    assert still_new == [expired]
+
+
+def test_mark_seen_button_follows_the_view(client):
+    assert "Diese Ansicht als gesehen markieren" in client.get("/?frist=alle").text
+    client.post("/gesehen", data={"next": "/", "status": "interessant", "frist": "alle"}, follow_redirects=False)
+    assert "Diese Ansicht als gesehen markieren" not in client.get("/?frist=alle").text
+    assert "Diese Ansicht als gesehen markieren" in client.get("/?status=nicht_interessant&frist=alle").text
+
+
+# ---------- Suchbereich und CPV-Bezeichnungen ----------
+
+def test_search_scope_limits_the_searched_fields(client):
+    with connect() as conn:
+        conn.execute("UPDATE tenders SET title = ?, description = ? WHERE id = 1",
+                     ("Titelbegriff Quittenkuchen", "Textbegriff Zwetschge"))
+
+    def page(**params):
+        return client.get("/", params={"status": "alle", "frist": "alle", **params}).text
+
+    assert "Titelbegriff Quittenkuchen" in page(q="Zwetschge")  # Standard: überall
+    assert "Titelbegriff Quittenkuchen" in page(q="Zwetschge", suchfeld="beschreibung")
+    assert "Titelbegriff Quittenkuchen" not in page(q="Zwetschge", suchfeld="titel")
+    assert "Titelbegriff Quittenkuchen" in page(q="Quittenkuchen", suchfeld="titel")
+    assert "Titelbegriff Quittenkuchen" not in page(q="Quittenkuchen", suchfeld="cpv")
+    assert 'name="suchfeld"' in page() and "suche nur Titel" in page()
+
+
+def test_cpv_title_is_shown_with_the_code(client):
+    with connect() as conn:
+        conn.execute("""UPDATE tenders SET cpv_codes = '[{"code": "45421000-4", "label": ""}]' WHERE id = 2""")
+    client.post("/einstellungen/klassifizierung",
+                data=rules_form(cpv=[("45421000", "Bautischlerarbeiten")], keyword=["arbeiten"], cpv_enabled="1"))
+
+    # Bezeichnung aus der CPV-Liste, obwohl die Quelle keine mitgeliefert hat
+    assert "Bautischlerarbeiten" in client.get("/eintrag/2").text
+
+    with connect() as conn:
+        conn.execute("""UPDATE tenders SET cpv_codes = '[{"code": "99999999-9", "label": ""}]' WHERE id = 2""")
+    assert "nicht im CPV-Katalog" in client.get("/eintrag/2").text
+
+
+def test_row_names_only_the_secondary_category(client):
+    """Die Gruppenüberschrift nennt die leitende Kategorie – in der Zeile steht nur die zweite."""
+    with connect() as conn:
+        conn.execute("UPDATE tenders SET category = 'vorinformation' WHERE id = 1")
+    group = client.get("/gruppe/berlin/ausschreibungen?status=alle&frist=alle").text
+    assert "Vorinformation" in group  # zweite Kategorie der Gruppe wird benannt
+    assert "Bekanntmachung" not in group  # leitende Kategorie nicht
+
+
+def test_cpv_catalog_supplies_the_official_titles(client):
+    """Codes ohne Bezeichnung in den Daten bekommen den amtlichen Titel aus dem CPV-Katalog."""
+    from app import cpv
+    assert len(cpv.titles()) > 9000
+    assert cpv.title("45421000-4") == "Bautischlerarbeiten"  # Prüfziffer wird ignoriert
+    assert cpv.title("09323000") == "Fernwärme"
+    assert cpv.title("99999999") == ""
+
+    with connect() as conn:
+        conn.execute("""UPDATE tenders SET cpv_codes = '[{"code": "30192000", "label": ""}]' WHERE id = 2""")
+    assert "Bürobedarf" in client.get("/eintrag/2").text
+
+
+def test_own_label_wins_over_the_catalog(client):
+    with connect() as conn:
+        conn.execute("""UPDATE tenders SET cpv_codes = '[{"code": "30192000", "label": "Unsere Schreibwaren"}]'
+                        WHERE id = 2""")
+    html = client.get("/eintrag/2").text
+    assert "Unsere Schreibwaren" in html and "Bürobedarf" not in html
+
+
+def test_only_new_is_the_default_in_the_tender_area(client):
+    """Standard im Ausschreibungsbereich: nur ungesehene Einträge. Haken raus zeigt wieder alle."""
+    with connect() as conn:
+        titel = conn.execute("SELECT title FROM tenders WHERE id = 1").fetchone()[0]
+
+    assert titel in client.get("/?status=alle&frist=alle").text
+    client.get("/eintrag/1")  # Öffnen markiert als gesehen
+    assert titel not in client.get("/?status=alle&frist=alle").text
+    assert titel in client.get("/?status=alle&frist=alle&neu=0").text
+
+    html = client.get("/?status=alle&frist=alle").text
+    assert 'name="neu" value="1" checked' in html  # Haken ist gesetzt
+    assert 'name="neu" value="0"' in html  # und lässt sich abwählen
+    assert "auch gesehene anzeigen" in html
+
+
+def test_empty_view_explains_that_nothing_is_new(client):
+    client.post("/gesehen", data={"next": "/", "status": "alle", "frist": "alle"}, follow_redirects=False)
+    html = client.get("/?status=alle&frist=alle").text
+    assert "Nichts Neues" in html and "auch gesehene anzeigen" in html
+    assert "Noch keine Daten" not in html
+
+
+def test_favorites_tab_still_shows_seen_entries(client):
+    """Der Reiter „♥ Auftraggeber“ behält „alles anzeigen“ – dort geht es nicht um den Tagesdurchlauf."""
+    client.get("/eintrag/1")
+    html = client.get("/auftraggeber").text
+    assert 'name="neu" value="1" checked' not in html
+
+
+def test_cpv_search_finds_code_and_title(client):
+    from app import cpv
+    assert [t["code"] for t in cpv.search("09323")] == ["09323000"]
+    assert {"code": "09323000", "title": "Fernwärme"} in cpv.search("fernwärme")
+    assert cpv.search("z") == []  # zu kurz
+
+    treffer = client.get("/api/cpv", params={"q": "solarenergie"}).json()
+    assert {"code": "09330000", "title": "Solarenergie"} in treffer
+
+
+def test_new_cpv_rule_takes_its_title_from_the_catalog(client):
+    from app import settings
+    # Hinzufügen ohne Bezeichnung: Titel kommt aus dem Katalog
+    client.post("/einstellungen/klassifizierung",
+                data={**rules_form(keyword=["arbeiten"], cpv_enabled="1"),
+                      "rule-cpv-1000-value": "45421000", "rule-cpv-1000-active": "1"})
+    assert settings.list_rules("cpv") == [
+        {"value": "45421000", "label": "Bautischlerarbeiten", "active": 1, "scope": "alles"}
+    ]
+
+    # Eine schon eingetragene eigene Bezeichnung bleibt beim Speichern erhalten
+    client.post("/einstellungen/klassifizierung",
+                data={**rules_form(cpv=[("45421000", "Unsere Tischler")], keyword=["arbeiten"], cpv_enabled="1")})
+    assert settings.list_rules("cpv")[0]["label"] == "Unsere Tischler"
+
+
+def test_unknown_cpv_code_is_rejected(client):
+    response = client.post("/einstellungen/klassifizierung",
+                           data={**rules_form(keyword=["arbeiten"], cpv_enabled="1"),
+                                 "rule-cpv-1000-value": "99999999", "rule-cpv-1000-active": "1"})
+    assert "steht nicht im CPV-Katalog" in response.text
+
+
+def test_cpv_add_field_searches_the_catalog(client):
+    html = client.get("/einstellungen").text
+    assert 'list="cpv-katalog"' in html and '<datalist id="cpv-katalog">' in html
+    assert "Bezeichnung (optional)" not in html  # keine freie Texteingabe mehr

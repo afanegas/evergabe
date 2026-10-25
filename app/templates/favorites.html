@@ -4,6 +4,7 @@
 {% block next_url %}{{ current_url }}{% endblock %}
 
 {% block content %}
+{% from "_macros.html" import authority_link %}
 {% include "_list_head.html" %}
 
 {% if not blocks %}
@@ -25,7 +26,8 @@
   </summary>
   {% if b.names %}
     <p class="fav-names muted">
-      Gefundene Namen: {{ b.names | reject('none') | join(' · ') }}
+      Gefundene Namen:
+      {% for name in b.names | reject('none') %}{{ authority_link(name) }}{% if not loop.last %} · {% endif %}{% endfor %}
     </p>
   {% endif %}
 

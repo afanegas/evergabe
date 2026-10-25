@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, cpv_chip, keyword_chip, deadline, source_badges %}
+{% from "_macros.html" import status_badge, cpv_chip, keyword_chip, deadline, source_badges, authority_link %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block page %}detail{% endblock %}
 {% block next_url %}/eintrag/{{ item.id }}{% endblock %}
@@ -21,7 +21,7 @@
     <h1>{{ item.title }}</h1>
     {% if item.authority %}
       <div class="authority-line">
-        <span class="muted">{{ item.authority }}</span>
+        {{ authority_link(item.authority) }}
         {% if item.favorite %}
           <form method="post" action="/auftraggeber/entfernen" class="inline"
                 data-confirm="Beobachtung beenden für: {{ item.authority_matches | join(', ') }}?">
@@ -65,10 +65,15 @@
 
     <h3>CPV-Prüfung {{ cpv_chip(item) }}</h3>
     {% if item.cpv_codes %}
+      {% set cpv_labels = cpv_rule_labels() %}
       <ul class="cpv-list">
         {% for c in item.cpv_codes %}
           {% set hit = cpv_code_hit(c.code, item.cpv_matches) %}
-          <li class="{% if hit %}hit{% endif %}"><code>{{ c.code }}</code> {{ c.label }}{% if hit %} <span class="chip chip-hit">Liste: {{ hit | join(', ') }}</span>{% endif %}</li>
+          {% set label = cpv_title(item, c.code, cpv_labels) %}
+          <li class="{% if hit %}hit{% endif %}"><code>{{ c.code }}</code>
+            {% if label %}{{ label }}{% else %}<span class="muted">(nicht im CPV-Katalog)</span>{% endif %}
+            {% if hit %}<span class="chip chip-hit" title="{% for h in hit %}{{ h }}{% if cpv_labels.get(h) %} – {{ cpv_labels[h] }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}">Liste: {% for h in hit %}{{ h }}{% if cpv_labels.get(h) %} <span class="chip-label">{{ cpv_labels[h] }}</span>{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+          </li>
         {% endfor %}
       </ul>
     {% elif item.detail_status in ('offen', 'fehler') %}

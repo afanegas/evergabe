@@ -191,3 +191,21 @@ def test_digest_lookback_is_capped(client, monkeypatch):
     assert mailer.run_digest()["sent"]
     html = FakeSMTP.sent[-1].get_body(("html",)).get_content()
     assert "Von gestern" in html and "Von vor zehn Tagen" not in html
+
+
+def test_mail_goes_to_several_recipients(client):
+    """Mehrere Empfänger, zeilen- oder kommagetrennt eingetragen – alle bekommen dieselbe Mail."""
+    client.post("/einstellungen/mail", data={
+        "mail_enabled": "1", "mail_time": "7:05",
+        "mail_to": "a@example.org\nb@example.org, c@example.org;a@example.org",  # Dublette fällt weg
+    })
+    assert settings.get_all()["mail_to"] == "a@example.org, b@example.org, c@example.org"
+
+    html = client.get("/einstellungen").text
+    assert '<textarea name="mail_to"' in html  # mehrzeiliges Feld statt einzeiliger Eingabe
+    assert "3 Empfänger: a@example.org, b@example.org, c@example.org" in html
+
+    settings.set_many({"mail_last_sent_at": "2000-01-01T00:00:00"})
+    result = mailer.run_digest()
+    assert result["sent"] and result["recipients"] == ["a@example.org", "b@example.org", "c@example.org"]
+    assert FakeSMTP.sent[-1]["To"] == "a@example.org, b@example.org, c@example.org"

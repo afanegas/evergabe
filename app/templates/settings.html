@@ -16,7 +16,11 @@
     <label class="rule-toggle">
       <input type="checkbox" name="{{ prefix }}-active" value="1" {% if e.active %}checked{% endif %}>
       <span class="rule-value">{% if kind == 'cpv' %}<code>{{ e.value }}</code>{% else %}{{ e.value }}{% endif %}</span>
-      {% if kind == 'cpv' and e.label %}<span class="rule-label muted">{{ e.label }}</span>{% endif %}
+      {% if kind == 'cpv' %}
+        {# Eigene Bezeichnung, sonst die amtliche aus dem CPV-Katalog #}
+        {% if e.label %}<span class="rule-label muted">{{ e.label }}</span>
+        {% elif cpv_katalog(e.value) %}<span class="rule-label muted">{{ cpv_katalog(e.value) }}</span>{% endif %}
+      {% endif %}
     </label>
     <input type="hidden" name="{{ prefix }}-value" value="{{ e.value }}">
     {% if kind == 'cpv' %}
@@ -101,8 +105,12 @@
         </ul>
         <div class="rule-add">
           {% if kind == 'cpv' %}
-            <input type="text" class="rule-add-value narrow-code" placeholder="71314000" inputmode="numeric" aria-label="Neuer CPV-Code">
-            <input type="text" class="rule-add-label" placeholder="Bezeichnung (optional)" aria-label="Bezeichnung">
+            {# Gesucht wird im amtlichen CPV-Katalog: Code und Bezeichnung kommen immer zusammen #}
+            <input type="text" class="rule-add-value grow" list="cpv-katalog" autocomplete="off"
+                   placeholder="Code oder Bezeichnung suchen, z. B. 71314 oder Solar" aria-label="CPV-Code suchen">
+            <datalist id="cpv-katalog"></datalist>
+            <input type="hidden" class="rule-add-label" value="">
+            <span class="rule-add-title muted"></span>
           {% elif kind == 'authority' %}
             <input type="text" class="rule-add-value" placeholder="Name oder Namensteil, z. B. Bezirksamt Mitte" aria-label="Neuer Auftraggeber" list="authority-names">
           {% else %}
@@ -235,9 +243,13 @@
   {% endif %}
   <form method="post" action="/einstellungen/mail" class="mail-form">
     <label class="check"><input type="checkbox" name="mail_enabled" value="1" {% if values.mail_enabled %}checked{% endif %}> <strong>Tägliche E-Mail</strong> aktiv</label>
-    <label>Empfänger <small class="muted">(mehrere durch Komma trennen)</small>
-      <input type="text" name="mail_to" value="{{ values.mail_to }}" placeholder="name@example.org" autocomplete="email">
+    <label>Empfänger <small class="muted">(mehrere erlaubt – pro Zeile oder durch Komma getrennt; alle bekommen dieselbe Mail)</small>
+      <textarea name="mail_to" rows="3" placeholder="name@example.org&#10;kollegin@example.org">{{ mail_recipients | join('
+') }}</textarea>
     </label>
+    {% if mail_recipients %}
+      <p class="muted">{{ mail_recipients | length }} Empfänger: {{ mail_recipients | join(', ') }}</p>
+    {% endif %}
     <label>Uhrzeit
       <input type="text" name="mail_time" value="{{ values.mail_time }}" class="narrow" placeholder="07:30">
     </label>

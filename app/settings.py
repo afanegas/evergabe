@@ -3,7 +3,7 @@
 import json
 import re
 
-from . import config
+from . import config, cpv
 from .classify import Rules
 from .db import connect
 
@@ -267,6 +267,13 @@ def parse_rules_form(form) -> tuple[dict[str, list[dict]], list[str]]:
                 errors.append(f"Ungültiger CPV-Code „{value}“ (erwartet: 8 Ziffern, z. B. 71314000)")
             else:
                 entry["value"] = code
+                # Ohne eigene Bezeichnung die amtliche aus dem Katalog – so passen Code und Titel immer
+                # zusammen. Bereits eingetragene eigene Bezeichnungen bleiben, wie sie sind.
+                amtlich = cpv.title(code)
+                if not label:
+                    entry["label"] = amtlich
+                    if not amtlich and cpv.titles():
+                        errors.append(f"„{code}“ steht nicht im CPV-Katalog – bitte aus der Liste wählen.")
         rows[kind].append((index, entry))
 
     rules: dict[str, list[dict]] = {}

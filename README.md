@@ -116,7 +116,17 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 
 - **Ausschreibungen**: Tabs Interessant / Nicht interessant / Alle, Filter, Suche, Einstufung per Klick überschreiben.
   Gruppiert nach Region (Berlin aufgeklappt, Brandenburg und Rest zugeklappt), darin Ausschreibungen,
-  Beabsichtigte Vergaben und Vergebene Aufträge. Die Quelle steht an jedem Eintrag.
+  Beabsichtigte Vergaben und Vergebene Aufträge. In der Zeile stehen Auftraggeber, Verfahren und die
+  CPV-Treffer mit Bezeichnung; die Quelle und die Kategorie „Bekanntmachung“ nur auf der Detailseite.
+- **Suche**: Suchbegriff und daneben der Suchbereich – überall (Standard), nur Titel, nur Beschreibung,
+  nur Auftraggeber oder nur CPV-Code.
+- **Auftraggeber**: überall als Link – öffnet in einem neuen Tab die Suche nach dieser Vergabestelle
+  (Reiter „Alle“).
+- **Gesehen**: Im Ausschreibungsbereich ist „nur neue“ voreingestellt – die Liste zeigt also nur, was noch
+  nicht gesehen wurde, und abgehakte Einträge verschwinden daraus. „auch gesehene anzeigen“ (bzw. der Haken)
+  zeigt wieder alles; der Reiter „♥ Auftraggeber“ zeigt weiterhin alles. Ein Eintrag gilt als gesehen,
+  sobald er geöffnet wurde, oder über „Diese Ansicht als gesehen markieren“ – das wirkt nur auf die
+  gerade gefilterte Ansicht (Reiter und Filter).
 - **Fristen**: Einträge mit abgelaufener Frist sind standardmäßig ausgeblendet (Hinweis „N ausgeblendet – anzeigen“);
   Auswahl im Filter: abgelaufene ausblenden / nur offene Fristen / alle. Einträge ohne Frist bleiben sichtbar.
 - **♥ Auftraggeber**: eigener Reiter für beobachtete Auftraggeber – je Auftraggeber ein Block mit Ausschreibungen,
@@ -127,6 +137,10 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 - **Detailansicht**: Prüfergebnisse (welche CPV-Codes/Stichwörter gegriffen haben), Beschreibung mit Markierungen, Notiz
 - **Einstellungen**:
   - CPV-Prüfung und Stichwort-Prüfung einzeln an/aus, Verknüpfung ODER / UND
+  - E-Mail: mehrere Empfänger (pro Zeile oder durch Komma getrennt), alle bekommen dieselbe Mail
+  - CPV-Codes werden im amtlichen Katalog gesucht (nach Code oder Bezeichnung) und mit ihrer Bezeichnung
+    übernommen – Code und Titel gehören zusammen und werden nicht getippt. Eigene Bezeichnungen, die schon
+    in der Liste stehen, bleiben erhalten.
   - CPV-Codes, Stichwörter, ★ wichtige Stichwörter, Ausschluss-Stichwörter als Listen: jeder Eintrag per Checkbox an/aus,
     „+ Hinzufügen“ (auch mit Enter) und × zum Löschen; „alle an / alle aus“. Änderungen werden gesammelt und mit
     „Speichern & neu klassifizieren“ übernommen. Abgeschaltete Einträge bleiben gespeichert, wirken aber nicht.
@@ -147,6 +161,11 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 | Stichwort | ein Stichwort in Titel/Auftragsgegenstand/Art der Leistung/Kurzbeschreibung vorkommt und kein Ausschluss-Stichwort |
 
 Einträge ohne CPV-Codes (Vergebene Aufträge, Vorinformationen) werden nur über Stichwörter bewertet.
+
+Zu jedem CPV-Code zeigt die App eine Bezeichnung: zuerst die Angabe der Quelle am Eintrag, dann eine eigene
+Bezeichnung aus der CPV-Liste, sonst den amtlichen Titel aus `app/cpv_de.json.gz`. Das ist der deutsche Teil des
+offiziellen Vokabulars CPV 2008 (Verordnung (EG) Nr. 213/2008, 9454 Codes), aus der Datei `cpv_2008_xml` von
+<https://ted.europa.eu/en/simap/cpv> erzeugt. Er ändert sich nur, wenn die EU ihn überarbeitet.
 Stichwörter mit bis zu 3 Zeichen (z. B. `PV`) oder in Anführungszeichen zählen nur als ganzes Wort.
 `*` ist ein Platzhalter für beliebige Buchstaben, auch über eine Trennstelle hinweg (bis zu drei Leerzeichen,
 Bindestriche oder Gedankenstriche, z. B. „- “ oder ein doppeltes Leerzeichen): `Energie*spar*contracting` trifft
