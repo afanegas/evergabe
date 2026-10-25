@@ -163,6 +163,12 @@ tbody tr:hover { background: #fbfaf7; }
 .tenders tr.is-low:not(.is-important) td:first-child { border-left-color: #b8b6b0; }
 .tenders tr.is-low:hover td { opacity: 1; }
 .chip-low { background: #eeede9; color: #5f5e5a; border-color: #d6d4ce; }
+.pill-ai {
+  background: #e8f0fe; color: #1b4a8a; border: 1px solid #a9c5ee;
+  font-size: 0.66rem; font-weight: 700; padding: 0.02rem 0.35rem; border-radius: 4px; letter-spacing: 0.04em;
+  flex-shrink: 0; white-space: nowrap;
+}
+.chip-ai { background: #e8f0fe; color: #1b4a8a; border-color: #a9c5ee; }
 .pill-new { background: var(--accent); color: #fff; font-size: 0.66rem; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 4px; letter-spacing: 0.04em; flex-shrink: 0; }
 .badge { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; }
 .badge-yes { background: var(--yes-soft); color: var(--yes); }
@@ -309,3 +315,17 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
   .container { padding: 1rem; }
   .detail-head { flex-direction: column; }
 }
+
+/* KI-Auswahl: Anfrage und Antwort als Textfelder mit fester Schriftbreite */
+.ki-text { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; }
+.ki-items { margin: 0.4rem 0 0.8rem 1rem; font-size: 0.85rem; }
+.ki-items code { color: var(--muted); }
+
+/* Lange Erklärungen (KI-Auswahl) dürfen umbrechen – .check ist sonst bewusst einzeilig */
+.check-long { white-space: normal; align-items: flex-start; line-height: 1.4; }
+.check-long input { margin-top: 0.25rem; flex-shrink: 0; }
+.check-long small { margin-left: 0.3rem; }
+
+/* Kombinierbare Markierungs-Filter über der Liste */
+.filter-marks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.8rem; }
+.filter-marks .check { font-size: 0.85rem; }

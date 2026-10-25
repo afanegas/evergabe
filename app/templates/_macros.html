@@ -33,6 +33,21 @@
   {% endif %}
 {%- endmacro %}
 
+{% macro ai_chip(item) -%}
+  {% set r = item.ai_result %}
+  {% if r == 'treffer' %}
+    <span class="chip chip-ai" title="Die KI hält den Eintrag für passend">KI ✓</span>
+  {% elif r == 'kein_treffer' %}
+    <span class="chip chip-miss" title="Die KI hält den Eintrag für nicht passend">KI ✗</span>
+  {% elif r == 'unklar' %}
+    <span class="chip chip-na" title="Die KI konnte sich nicht entscheiden – gilt als kein Treffer">KI ?</span>
+  {% elif item.ai_state == 'offen' %}
+    <span class="chip chip-na" title="Wartet auf die Bewertung (Seite „KI-Auswahl“)">KI offen</span>
+  {% else %}
+    <span class="chip chip-na" title="Noch nicht bewertet">KI –</span>
+  {% endif %}
+{%- endmacro %}
+
 {% macro authority_link(name) -%}
   {# Suche nach dieser Vergabestelle im Ausschreibungsbereich, Reiter „Alle“ – in einem neuen Tab #}
   <a class="authority-search" target="_blank" rel="noopener"

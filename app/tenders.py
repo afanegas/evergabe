@@ -9,7 +9,19 @@ from .db import connect, now, row_to_dict
 
 STATUS_SQL = "COALESCE(manual_status, auto_status)"
 
-# In jeder Gruppe zuerst nach Priorität (wichtig oben, niedrig unten), dann nach der gewählten Sortierung
+# Markierungs-Filter: mehrere lassen sich kombinieren, dann müssen alle zutreffen.
+# Reihenfolge = Reihenfolge der Kästchen über der Liste.
+TREFFER_FILTERS = {
+    "ki": ("🤖 KI-Treffer", "ai_match = 1"),
+    "wichtig": ("★ Wichtig", "important = 1"),
+    "favorit": ("♥ Beobachtet", "favorite = 1"),
+    "cpv": ("CPV-Treffer", "cpv_result = 'treffer'"),
+    "stichwort": ("Stichwort-Treffer", "keyword_result = 'treffer'"),
+    "manuell": ("Manuell eingestuft", "manual_status IS NOT NULL"),
+}
+
+# In jeder Gruppe stehen zuerst die KI-Treffer, dann die übrige Priorität (wichtig oben, niedrig unten),
+# dann folgt die gewählte Sortierung.
 # Suchbereich: welche Spalten der Suchbegriff durchsucht. "" ist der Standard – alles, was früher
 # fest eingebaut war.
 SEARCH_FIELDS = {
@@ -77,13 +89,14 @@ class Filters:
     q: str = ""
     suchfeld: str = ""  # Suchbereich, siehe SEARCH_FIELDS
     vergabestelle: str = ""
-    treffer: str = ""  # cpv | stichwort | wichtig | niedrig | favorit | manuell
+    treffer: tuple[str, ...] = ()  # kombinierbar, siehe TREFFER_FILTERS – alle Gewählten müssen zutreffen
+    niedrig: str = ""  # "" = alle | nur = nur niedrige | ohne = niedrige ausblenden
     frist: str = ""  # "" = abgelaufene ausblenden (Standard) | offen = nur mit offener Frist | alle
     neu: bool = False  # nur ungesehene Einträge; im Ausschreibungsbereich der Standard
     sort: str = "neueste"
 
 
-def _not_expired() -> tuple[str, list]:
+def not_expired() -> tuple[str, list]:
     """Frist nicht abgelaufen. Fristen ohne Uhrzeit (JJJJ-MM-TT) gelten bis Ende des Tages."""
     current = now()
     return (
@@ -136,21 +149,16 @@ def _where(
     if filters.vergabestelle:
         clauses.append("authority LIKE ?")
         params.append(f"%{filters.vergabestelle}%")
-    if filters.treffer == "cpv":
-        clauses.append("cpv_result = 'treffer'")
-    elif filters.treffer == "stichwort":
-        clauses.append("keyword_result = 'treffer'")
-    elif filters.treffer == "wichtig":
-        clauses.append("important = 1")
-    elif filters.treffer == "niedrig":
+    for key in filters.treffer:
+        if key in TREFFER_FILTERS:
+            clauses.append(TREFFER_FILTERS[key][1])
+    if filters.niedrig == "nur":
         clauses.append("low_priority = 1")
-    elif filters.treffer == "favorit":
-        clauses.append("favorite = 1")
-    elif filters.treffer == "manuell":
-        clauses.append("manual_status IS NOT NULL")
+    elif filters.niedrig == "ohne":
+        clauses.append("low_priority = 0")
     frist = filters.frist if frist is None else frist
     if frist in ("", "offen", "abgelaufen"):
-        condition, condition_params = _not_expired()
+        condition, condition_params = not_expired()
         if frist == "abgelaufen":  # nur für die Anzeige „N abgelaufene ausgeblendet“
             clauses.append(f"deadline IS NOT NULL AND deadline != '' AND NOT {condition}")
         elif frist == "offen":
@@ -186,7 +194,8 @@ def search(
     with connect() as conn:
         total = conn.execute(f"SELECT COUNT(*) FROM tenders{where}", params).fetchone()[0]
         rows = conn.execute(
-            f"SELECT * FROM tenders{where} ORDER BY priority_level DESC, {order}, id DESC LIMIT ?", [*params, limit]
+            f"SELECT * FROM tenders{where} ORDER BY ai_match DESC, priority_level DESC, {order}, id DESC LIMIT ?",
+            [*params, limit],
         ).fetchall()
         items = [row_to_dict(r) for r in rows]
         attach_sources(conn, items)

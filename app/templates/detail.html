@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, cpv_chip, keyword_chip, deadline, source_badges, authority_link %}
+{% from "_macros.html" import status_badge, cpv_chip, keyword_chip, ai_chip, deadline, source_badges, authority_link %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block page %}detail{% endblock %}
 {% block next_url %}/eintrag/{{ item.id }}{% endblock %}
@@ -96,6 +96,17 @@
       <p>Niedrige Priorität: {% for k in item.lowprio_matches %}<span class="chip chip-low">↓ {{ k }}</span> {% endfor %}
         {% if item.status != 'interessant' %}<small class="muted">(wirkt nur bei interessanten Einträgen)</small>
         {% elif not item.low_priority %}<small class="muted">(wichtiges Stichwort hat Vorrang)</small>{% endif %}</p>
+    {% endif %}
+
+    <h3>KI-Auswahl {{ ai_chip(item) }}</h3>
+    {% if item.ai_result %}
+      {% if item.ai_reason %}<p>{{ item.ai_reason }}</p>{% endif %}
+      <p class="muted"><small>Bewertet {{ item.ai_checked_at | dt }}{% if item.ai_model %}
+        ({{ 'Antwort von Hand eingefügt' if item.ai_model == 'manuell' else item.ai_model }}){% endif %}</small></p>
+    {% elif item.ai_state == 'offen' %}
+      <p class="muted">Steht in der Warteschlange – <a href="/ki">jetzt bewerten</a>.</p>
+    {% else %}
+      <p class="muted">Noch nicht bewertet.</p>
     {% endif %}
   </section>
 

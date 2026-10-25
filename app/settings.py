@@ -4,7 +4,7 @@ import json
 import re
 
 from . import config, cpv
-from .classify import Rules
+from .classify import AI_MARKIERUNG, AI_PRUEFUNG, Rules
 from .db import connect
 
 DEFAULTS = {
@@ -24,6 +24,17 @@ DEFAULTS = {
     "mail_time": "07:30",
     "mail_last_sent_at": None,  # Zeitpunkt der letzten verschickten Mail (neue Treffer seitdem)
     "mail_last_check": None,  # Ergebnis des letzten Versandversuchs
+    # KI-Auswahl (siehe app/ai.py). Das Leistungsprofil steht bewusst nur hier in der Datenbank
+    # und nicht im Quellcode – das Repository ist öffentlich.
+    "ai_enabled": False,
+    "ai_mode": AI_MARKIERUNG,  # markierung (nur Kennzeichnung) | pruefung (dritte Prüfung)
+    "ai_profile": "",  # Leistungsprofil, an dem die KI die Bekanntmachung messen soll
+    "ai_regions": ["berlin", "brandenburg"],  # welche Regionen bewertet werden
+    "ai_max_per_run": 25,  # Obergrenze je Durchgang
+    # Nur Bekanntmachungen aus den letzten N Tagen bewerten (0 = ohne Grenze). Verhindert, dass sich
+    # nach einer Pause ein Berg alter Einträge ansammelt, den niemand mehr braucht.
+    "ai_max_age_days": 30,
+    "ai_backend": "manuell",  # manuell: Prompt kopieren, Antwort einfügen (Stufe 1)
 }
 
 START_CPV = [
@@ -187,6 +198,8 @@ def load_rules() -> Rules:
         priority_conflict=values["priority_conflict"],
         cpv_enabled=bool(values["cpv_enabled"]),
         keyword_enabled=bool(values["keyword_enabled"]),
+        ai_enabled=bool(values["ai_enabled"]) and bool((values["ai_profile"] or "").strip()),
+        ai_mode=values["ai_mode"] if values["ai_mode"] in (AI_MARKIERUNG, AI_PRUEFUNG) else AI_MARKIERUNG,
         combine=values["combine"],
     )
 
@@ -300,6 +313,41 @@ def replace_rules(rules: dict[str, list[dict]]) -> None:
                     for e in entries
                 ],
             )
+
+
+AI_REGIONS = ("berlin", "brandenburg", "rest")
+
+
+def parse_ai_form(form) -> tuple[dict, list[str]]:
+    """Einstellungen der KI-Auswahl aus dem Formular lesen."""
+    errors: list[str] = []
+    mode = form.get("ai_mode")
+    if mode not in (AI_MARKIERUNG, AI_PRUEFUNG):
+        mode = AI_MARKIERUNG
+    regions = [r for r in AI_REGIONS if form.get(f"ai_region_{r}")]
+    profile = (form.get("ai_profile") or "").strip()
+    enabled = bool(form.get("ai_enabled"))
+    try:
+        max_per_run = int((form.get("ai_max_per_run") or "").strip())
+    except ValueError:
+        max_per_run = 0
+    if not 1 <= max_per_run <= 200:
+        errors.append("Höchstens je Durchgang: bitte eine Zahl zwischen 1 und 200 angeben.")
+        max_per_run = DEFAULTS["ai_max_per_run"]
+    try:
+        max_age = int((form.get("ai_max_age_days") or "").strip())
+    except ValueError:
+        max_age = -1
+    if not 0 <= max_age <= 3650:
+        errors.append("Höchstalter: bitte eine Zahl zwischen 0 (ohne Grenze) und 3650 Tagen angeben.")
+        max_age = DEFAULTS["ai_max_age_days"]
+    if enabled and not profile:
+        errors.append("Ohne Leistungsprofil kann die KI-Auswahl nicht eingeschaltet werden.")
+    if enabled and not regions:
+        errors.append("Für die KI-Auswahl muss mindestens eine Region ausgewählt sein.")
+    values = {"ai_enabled": enabled, "ai_mode": mode, "ai_profile": profile, "ai_regions": regions,
+              "ai_max_per_run": max_per_run, "ai_max_age_days": max_age}
+    return values, errors
 
 
 def parse_times(text: str) -> tuple[list[str], list[str]]:

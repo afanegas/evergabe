@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from . import config, settings
+from . import ai, config, settings
 from .categories import SOURCE_BERLIN, SOURCE_OV
 from .classify import Rules, classify, match_terms
 from .db import connect, now, row_to_dict
@@ -353,7 +353,8 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
     counts = {"gesamt": 0, "interessant": 0}
     favorites = settings.load_favorites()
     columns = (
-        "id, title, subject, service_type, description, detail_fields, cpv_codes, manual_status, auto_status, authority"
+        "id, title, subject, service_type, description, detail_fields, cpv_codes, manual_status, auto_status, "
+        "authority, ai_result"
     )
     with connect() as conn:
         if ids is None:
@@ -372,14 +373,14 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
                 item = row_to_dict(row)
                 result = classify(
                     classification_text(item), [c["code"] for c in item["cpv_codes"]], rules,
-                    title=item["title"], manual_status=row["manual_status"],
+                    title=item["title"], manual_status=row["manual_status"], ai_result=row["ai_result"],
                 )
                 updates.append((
                     result.status, result.cpv, _dumps(result.cpv_matches), result.keyword,
                     _dumps(result.keyword_matches), _dumps(result.exclusion_matches),
                     _dumps(result.priority_matches), int(result.important),
                     _dumps(result.lowprio_matches), int(result.low_priority), result.level,
-                    *_favorite_values(row["authority"], favorites), row["id"],
+                    int(result.ai_match), *_favorite_values(row["authority"], favorites), row["id"],
                 ))
                 counts["gesamt"] += 1
                 if (row["manual_status"] or result.status) == "interessant":
@@ -387,7 +388,8 @@ def reclassify(ids=None, rules: Rules | None = None) -> dict:
         conn.executemany(
             "UPDATE tenders SET auto_status = ?, cpv_result = ?, cpv_matches = ?, keyword_result = ?, "
             "keyword_matches = ?, exclusion_matches = ?, priority_matches = ?, important = ?, "
-            "lowprio_matches = ?, low_priority = ?, priority_level = ?, favorite = ?, authority_matches = ? WHERE id = ?",
+            "lowprio_matches = ?, low_priority = ?, priority_level = ?, ai_match = ?, favorite = ?, "
+            "authority_matches = ? WHERE id = ?",
             updates,
         )
     return counts
@@ -469,6 +471,12 @@ def run_fetch(trigger: str = "zeitplan") -> bool:
 
         state.update(phase="Aufräumen", done=0, total=0)
         cleanup_rest()
+
+        # Neue Einträge in die Warteschlange der KI-Auswahl stellen (bewertet wird erst auf der Seite /ki)
+        try:
+            ai.mark_candidates()
+        except Exception:
+            log.exception("KI-Auswahl: Warteschlange konnte nicht aktualisiert werden")
     except Exception as exc:
         log.exception("Abruf fehlgeschlagen")
         errors.append(str(exc))

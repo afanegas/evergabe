@@ -131,7 +131,76 @@
       <a class="btn btn-ghost btn-sm" href="/einstellungen">Verwerfen</a>
       <button class="btn btn-primary" type="submit">Speichern &amp; neu klassifizieren</button>
     </div>
-    <button class="btn btn-primary" type="submit">Speichern &amp; neu klassifizieren</button>
+    {# Zweiter Knopf für den unveränderten Zustand; sobald die Leiste oben erscheint, blendet ihn app.js aus #}
+    <button class="btn btn-primary save-button" type="submit" {% if rules_dirty %}hidden{% endif %}>Speichern &amp; neu klassifizieren</button>
+  </form>
+</section>
+
+<section class="card" id="ki">
+  <h2>🤖 KI-Auswahl</h2>
+  <p class="muted">
+    Eine KI liest Titel und Beschreibung und entscheidet anhand des Leistungsprofils, ob die Bekanntmachung
+    zum Angebot passt. Das Urteil wird gespeichert und bei einer Neu-Klassifizierung nur abgelesen, nie
+    erneut erfragt. Bewertet wird auf der Seite <a href="/ki">🤖 KI-Auswahl</a>; „unklar“ gilt als kein Treffer.
+  </p>
+
+  <form method="post" action="/einstellungen/ki" class="mail-form">
+    <label class="check"><input type="checkbox" name="ai_enabled" value="1" {% if values.ai_enabled %}checked{% endif %}> <strong>KI-Auswahl</strong> aktiv</label>
+
+    <fieldset class="radio-group">
+      <legend>Wie das Urteil wirkt</legend>
+      <label class="check check-long"><input type="radio" name="ai_mode" value="markierung" {% if values.ai_mode != 'pruefung' %}checked{% endif %}>
+        <span><strong>Nur Markierung</strong> – bewertet werden nur Einträge, die über CPV oder Stichwörter schon
+        interessant sind. Die Einstufung bleibt unberührt, passende Einträge werden mit 🤖 KI gekennzeichnet.
+        <small class="muted">Sparsam: wenige Bewertungen.</small></span></label>
+      <label class="check check-long"><input type="radio" name="ai_mode" value="pruefung" {% if values.ai_mode == 'pruefung' %}checked{% endif %}>
+        <span><strong>Dritte Prüfung</strong> – bewertet werden alle Einträge der gewählten Regionen; das Urteil zählt
+        wie CPV und Stichwörter mit (ODER/UND oben) und kann allein „interessant“ ergeben.
+        <small class="muted">Deutlich mehr Bewertungen.</small></span></label>
+    </fieldset>
+
+    <fieldset class="radio-group">
+      <legend>Regionen, die bewertet werden</legend>
+      {% for key, label in [('berlin', 'Berlin'), ('brandenburg', 'Brandenburg'), ('rest', 'Rest')] %}
+        <label class="check"><input type="checkbox" name="ai_region_{{ key }}" value="1" {% if key in values.ai_regions %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </fieldset>
+
+    <label>Höchstens je Durchgang <small class="muted">(so viele Einträge kommen in eine Anfrage)</small>
+      <input type="text" name="ai_max_per_run" value="{{ values.ai_max_per_run }}" class="narrow">
+    </label>
+
+    <label>Nur Bekanntmachungen der letzten … Tage
+      <small class="muted">Älteres wird nicht bewertet – so sammelt sich nach einer Pause kein Berg an.
+        0 = ohne Grenze.</small>
+      <input type="text" name="ai_max_age_days" value="{{ values.ai_max_age_days }}" class="narrow">
+    </label>
+
+    <label>Leistungsprofil
+      <small class="muted">Daran misst die KI jede Bekanntmachung: was ihr anbietet, für wen, in welcher Region –
+        und was ausdrücklich nicht passt. Der Text bleibt in dieser Datenbank und steht nicht im Quellcode.</small>
+      <textarea name="ai_profile" rows="16" placeholder="## Was wir anbieten&#10;…&#10;&#10;## Passt nicht zu uns&#10;…">{{ values.ai_profile }}</textarea>
+    </label>
+
+    <div class="mail-actions">
+      <button class="btn btn-primary" type="submit">KI-Einstellungen speichern</button>
+    </div>
+  </form>
+
+  {% if ai_status %}
+    <p class="muted">
+      Im Blick: {{ ai_status.gesamt }} Einträge · bewertet: {{ ai_status.bewertet }} ·
+      davon passend: {{ ai_status.treffer }} · offen: {{ ai_status.offen }}
+      {% if ai_status.gesamt_bewertet != ai_status.bewertet %}
+        <br><small>Insgesamt gespeicherte Urteile (auch außerhalb der gewählten Regionen): {{ ai_status.gesamt_bewertet }}</small>
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <form method="post" action="/einstellungen/ki/neu-bewerten">
+    <button class="btn" type="submit">Veraltete Urteile neu bewerten</button>
+    <small class="muted">Hat sich das Profil oder der Text einer Bekanntmachung geändert, ist das gespeicherte
+      Urteil veraltet. Hiermit wird es verworfen und der Eintrag wieder eingereiht – nichts passiert automatisch.</small>
   </form>
 </section>
 

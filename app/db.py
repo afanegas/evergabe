@@ -46,6 +46,15 @@ CREATE TABLE IF NOT EXISTS tenders (
     priority_level INTEGER NOT NULL DEFAULT 0,   -- Sortierung in der Gruppe: 2 wichtig, 1 beides, 0 normal, -1 niedrig
     favorite INTEGER NOT NULL DEFAULT 0,   -- Auftraggeber wird beobachtet
     authority_matches TEXT NOT NULL DEFAULT '[]',   -- getroffene Auftraggeber-Muster
+    -- KI-Auswahl: das Urteil wird gespeichert und bei einer Neu-Einstufung nur abgelesen,
+    -- nie neu erfragt (siehe app/ai.py)
+    ai_result TEXT,                        -- treffer | kein_treffer | unklar (NULL = noch nicht bewertet)
+    ai_reason TEXT,                        -- Begründung der KI
+    ai_state TEXT NOT NULL DEFAULT 'keine',   -- keine | offen (wartet) | ok | fehler
+    ai_checked_at TEXT,
+    ai_model TEXT,                         -- womit bewertet wurde (z. B. manuell)
+    ai_fingerprint TEXT,                   -- Kennung aus bewertetem Text + Profil; ändert sie sich, ist das Urteil veraltet
+    ai_match INTEGER NOT NULL DEFAULT 0,   -- von der KI als passend markiert
     manual_status TEXT,
     note TEXT,
     first_seen TEXT NOT NULL,
@@ -123,6 +132,7 @@ def init_db() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_tenders_region_category ON tenders(region, category);
             CREATE INDEX IF NOT EXISTS idx_tenders_favorite ON tenders(favorite);
+            CREATE INDEX IF NOT EXISTS idx_tenders_ai_state ON tenders(ai_state);
             -- Einträge aus der Zeit vor der Quellen-Tabelle stammen alle aus dem Berlin-Feed
             INSERT OR IGNORE INTO tender_sources(tender_id, source, uid, url, first_seen)
                 SELECT id, 'berlin', uid, url, first_seen FROM tenders
@@ -153,6 +163,13 @@ def _migrate_columns(conn) -> None:
         ("priority_level", "INTEGER NOT NULL DEFAULT 0"),
         ("favorite", "INTEGER NOT NULL DEFAULT 0"),
         ("authority_matches", "TEXT NOT NULL DEFAULT '[]'"),
+        ("ai_result", "TEXT"),
+        ("ai_reason", "TEXT"),
+        ("ai_state", "TEXT NOT NULL DEFAULT 'keine'"),
+        ("ai_checked_at", "TEXT"),
+        ("ai_model", "TEXT"),
+        ("ai_fingerprint", "TEXT"),
+        ("ai_match", "INTEGER NOT NULL DEFAULT 0"),
     ):
         if name not in columns:
             conn.execute(f"ALTER TABLE tenders ADD COLUMN {name} {definition}")

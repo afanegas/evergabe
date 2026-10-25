@@ -24,18 +24,28 @@ FAMILIES = {
 MAX_DAYS_APART = 30
 MIN_TITLE_LENGTH_WITHOUT_AUTHORITY = 25
 
-_STOPWORDS = {
+# oeffentlichevergabe.de schreibt Umlaute aus („Strukturdaten fuer die Verkehrsplanung“), die
+# Vergabeplattform Berlin nicht („für“). Ohne diese Angleichung gilt derselbe Auftrag als zwei Einträge.
+_UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def fold(text: str | None) -> str:
+    """Kleinschreibung mit ausgeschriebenen Umlauten."""
+    return (text or "").lower().translate(_UMLAUTE)
+
+
+_STOPWORDS = {fold(w) for w in (
     "berlin", "land", "landes", "von", "der", "die", "das", "des", "und", "fur", "für", "gmbh", "mbh", "ag",
     "aör", "aor", "vertreten", "durch", "bezirksamt", "senatsverwaltung", "zentrale", "vergabestelle",
-}
+)}
 
 
 def normalize_title(title: str | None) -> str:
-    return re.sub(r"[\W_]+", "", (title or "").lower())
+    return re.sub(r"[\W_]+", "", fold(title))
 
 
 def authority_tokens(name: str | None) -> set[str]:
-    words = re.findall(r"[a-zäöüß0-9]+", (name or "").lower())
+    words = re.findall(r"[a-z0-9]+", fold(name))
     return {w for w in words if len(w) >= 3 and w not in _STOPWORDS}
 
 

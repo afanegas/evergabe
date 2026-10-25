@@ -163,6 +163,10 @@ def test_dedupe_helpers():
     assert authorities_match("Bezirksamt Mitte von Berlin", "Bezirksamt Mitte") is True
     assert authorities_match("Bezirksamt Mitte", "Bezirksamt Pankow") is False
     assert authorities_match(None, "Gewobag") is None
+    # oeffentlichevergabe.de schreibt Umlaute aus, die Berliner Plattform nicht
+    assert normalize_title("Strukturdaten für die Verkehrsplanung") == normalize_title("Strukturdaten fuer die Verkehrsplanung")
+    assert normalize_title("Schloßstr. 69") == normalize_title("Schlossstr. 69")
+    assert authorities_match("Senatsverwaltung für Mobilität, Verkehr", "Senatsverwaltung fuer Mobilitaet, Verkehr") is True
 
 
 def test_cleanup_removes_only_old_uninteresting_rest_entries(db):

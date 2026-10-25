@@ -1,13 +1,17 @@
 import pytest
 
 from app.classify import (
+    AI_MARKIERUNG,
+    AI_PRUEFUNG,
     AUS,
     AUSGESCHLOSSEN,
     INTERESSANT,
     KEIN_TREFFER,
+    KEIN_URTEIL,
     KEINE_CODES,
     NICHT_INTERESSANT,
     TREFFER,
+    UNKLAR,
     Rules,
     classify,
     cpv_prefix,
@@ -195,3 +199,39 @@ def test_scope_per_keyword():
     assert match_terms(text, [("Neubau + Energiekonzept", "titel")], title) == []  # alle Teile im Titel nötig
     r = classify(text, [], rules(keywords=terms, exclusions=[("Photovoltaik", "titel")]), title=title)
     assert (r.keyword, r.keyword_matches) == (TREFFER, ["Photovoltaik"])  # Ausschluss nur im Titel greift nicht
+
+
+# ---------- KI-Auswahl ----------
+
+def test_ai_marking_does_not_change_status():
+    r = rules(ai_enabled=True, ai_mode=AI_MARKIERUNG)
+    miss = classify("Neubau einer Sporthalle", [], r, title="Neubau", ai_result=TREFFER)
+    assert miss.status == NICHT_INTERESSANT  # die KI allein stuft nicht um
+    assert (miss.ai, miss.ai_match) == (TREFFER, False)  # markiert werden nur interessante Einträge
+    hit = classify("Energieberatung für Schulen", [], r, title="Energieberatung", ai_result=TREFFER)
+    assert (hit.status, hit.ai_match) == (INTERESSANT, True)
+
+
+def test_ai_as_third_check_can_make_interesting():
+    r = rules(ai_enabled=True, ai_mode=AI_PRUEFUNG)
+    result = classify("Neubau einer Sporthalle", [], r, title="Neubau", ai_result=TREFFER)
+    assert (result.status, result.ai_match) == (INTERESSANT, True)
+
+
+def test_ai_unklar_counts_as_no_hit():
+    r = rules(ai_enabled=True, ai_mode=AI_PRUEFUNG)
+    result = classify("Neubau einer Sporthalle", [], r, title="Neubau", ai_result=UNKLAR)
+    assert (result.ai, result.status, result.ai_match) == (KEIN_TREFFER, NICHT_INTERESSANT, False)
+
+
+def test_ai_without_verdict_does_not_block_und():
+    """Ein noch nicht bewerteter Eintrag zählt nicht mit – sonst fiele bei „UND“ alles heraus."""
+    r = rules(ai_enabled=True, ai_mode=AI_PRUEFUNG, combine="und")
+    result = classify("Energieberatung", ["71314000"], r, title="Energieberatung")
+    assert (result.ai, result.status) == (KEIN_URTEIL, INTERESSANT)
+
+
+def test_ai_disabled_ignores_stored_verdict():
+    r = rules(ai_mode=AI_PRUEFUNG)  # ai_enabled bleibt aus
+    result = classify("Neubau einer Sporthalle", [], r, title="Neubau", ai_result=TREFFER)
+    assert (result.ai, result.status, result.ai_match) == (AUS, NICHT_INTERESSANT, False)

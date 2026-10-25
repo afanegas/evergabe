@@ -42,6 +42,10 @@ SOURCE_FAILURE_WARN = 2
 # Nicht interessante Einträge der Region „Rest“ ohne manuelle Einstufung/Notiz werden gelöscht
 REST_RETENTION_DAYS = 90
 
+# KI-Auswahl: So viele Zeichen der Beschreibung bekommt die KI je Eintrag zu sehen. Längere
+# Beschreibungen sind fast immer Vergabe- und Formalienkram, der für die Frage nichts hergibt.
+AI_TEXT_MAX_CHARS = 1500
+
 # ---------- Betrieb (Docker/Server) – alle Werte kommen aus Umgebungsvariablen bzw. der .env ----------
 
 # Öffentliche Adresse der App, z. B. https://evchecker.example.org – für Links in E-Mails

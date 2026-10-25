@@ -206,9 +206,10 @@ def test_rules_can_be_deactivated_added_and_deleted(client):
         maler = conn.execute("SELECT auto_status FROM tenders WHERE title = 'Maler- und Lackierarbeiten'").fetchall()
     assert maler and all(r["auto_status"] == "nicht_interessant" for r in maler)
 
-    # Seite zeigt Checkboxen statt Textfelder
+    # Seite zeigt Checkboxen statt Textfelder (nur der Abschnitt „Klassifizierung“ – der folgende
+    # Abschnitt „KI-Auswahl“ hat ein Textfeld für das Leistungsprofil)
     html = client.get("/einstellungen").text
-    assert "<textarea" not in html.split("Feeds")[0]
+    assert "<textarea" not in html.split('id="ki"')[0]
     assert 'name="rule-keyword-0-active" value="1" checked' in html
     assert 'name="rule-keyword-1-active" value="1" >' in html or 'name="rule-keyword-1-active" value="1">' in html
 

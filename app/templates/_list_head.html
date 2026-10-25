@@ -41,14 +41,10 @@
   <datalist id="authorities">
     {% for a in overview.authorities %}<option value="{{ a }}">{% endfor %}
   </datalist>
-  <select name="treffer">
-    <option value="">Alle Treffer</option>
-    <option value="cpv" {% if filters.treffer == 'cpv' %}selected{% endif %}>CPV-Treffer</option>
-    <option value="stichwort" {% if filters.treffer == 'stichwort' %}selected{% endif %}>Stichwort-Treffer</option>
-    <option value="wichtig" {% if filters.treffer == 'wichtig' %}selected{% endif %}>★ Wichtige Treffer</option>
-    <option value="niedrig" {% if filters.treffer == 'niedrig' %}selected{% endif %}>↓ Niedrige Priorität</option>
-    <option value="favorit" {% if filters.treffer == 'favorit' %}selected{% endif %}>♥ Beobachtete Auftraggeber</option>
-    <option value="manuell" {% if filters.treffer == 'manuell' %}selected{% endif %}>Manuell eingestuft</option>
+  <select name="niedrig" title="Niedrige Priorität">
+    <option value="" {% if filters.niedrig not in ('nur', 'ohne') %}selected{% endif %}>↓ Niedrige: anzeigen</option>
+    <option value="ohne" {% if filters.niedrig == 'ohne' %}selected{% endif %}>↓ Niedrige ausblenden</option>
+    <option value="nur" {% if filters.niedrig == 'nur' %}selected{% endif %}>↓ Nur niedrige</option>
   </select>
   <select name="frist" title="Fristen">
     <option value="" {% if filters.frist not in ('offen', 'alle') %}selected{% endif %}>Abgelaufene Fristen ausblenden</option>
@@ -64,6 +60,12 @@
      „nur neue“ würde wieder greifen #}
   <input type="hidden" name="neu" value="0">
   <label class="check"><input type="checkbox" name="neu" value="1" {% if filters.neu %}checked{% endif %}> nur neue</label>
+  {# Markierungen sind kombinierbar: gewählte müssen alle zutreffen #}
+  <span class="filter-marks" title="Mehrere lassen sich kombinieren – dann muss alles zutreffen">
+    {% for key, (label, _) in TREFFER_FILTERS.items() %}
+      <label class="check"><input type="checkbox" name="t_{{ key }}" value="1" {% if key in filters.treffer %}checked{% endif %}> {{ label }}</label>
+    {% endfor %}
+  </span>
   <button type="submit" class="btn">Filtern</button>
   <a href="{{ page_url }}?status={{ filters.status }}" class="btn btn-ghost">Zurücksetzen</a>
 </form>

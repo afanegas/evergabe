@@ -93,12 +93,15 @@
   if (!panels.length) return;
   const form = panels[0].closest("form");
   const saveBar = form.querySelector(".save-bar");
+  const saveButton = form.querySelector(".save-button");
   let dirty = Boolean(saveBar && !saveBar.hidden);
   let submitting = false;
 
   function markDirty() {
     dirty = true;
+    // Die Leiste enthält denselben Knopf – sonst stünde er zweimal da
     if (saveBar) saveBar.hidden = false;
+    if (saveButton) saveButton.hidden = true;
   }
 
   function updateCount(panel) {
@@ -285,5 +288,28 @@ document.addEventListener("submit", function (event) {
     uebernehmen();
     clearTimeout(timer);
     timer = setTimeout(suchen, 200);
+  });
+})();
+
+// Anfrage der KI-Auswahl in die Zwischenablage kopieren (Knopf mit data-copy="#ziel")
+(function () {
+  document.querySelectorAll("[data-copy]").forEach(function (knopf) {
+    const ziel = document.querySelector(knopf.dataset.copy);
+    if (!ziel) { return; }
+    knopf.addEventListener("click", function () {
+      const fertig = function () {
+        const text = knopf.textContent;
+        knopf.textContent = "kopiert ✓";
+        setTimeout(function () { knopf.textContent = text; }, 2000);
+      };
+      // navigator.clipboard gibt es nur über https oder auf localhost – sonst der alte Weg
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(ziel.value).then(fertig, function () { ziel.select(); });
+      } else {
+        ziel.select();
+        document.execCommand("copy");
+        fertig();
+      }
+    });
   });
 })();

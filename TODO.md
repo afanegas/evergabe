@@ -133,7 +133,16 @@ Stand: 13.09.2026 (Phase 1 fertig)
 - [ ] Git-Repository anlegen und nach GitHub übertragen
 
 ### Phase 3 – Erweiterungen
-- [ ] KI-Einschätzung (Claude) für Grenzfälle mit kurzer Begründung
+- [x] **KI-Auswahl** – Urteil einer KI zu Titel und Beschreibung anhand eines Leistungsprofils, mit kurzer Begründung
+  - [x] Zwei Betriebsarten: nur Markierung (Standard, bewertet nur bereits interessante Einträge) oder dritte
+        Prüfung neben CPV und Stichwörtern (ODER/UND); „unklar“ gilt als kein Treffer
+  - [x] Leistungsprofil als freier Text in den Einstellungen – nur in der Datenbank, nicht im Repository
+  - [x] Urteil wird gespeichert, eine Neu-Klassifizierung liest es nur ab; veraltet erst, wenn sich Text oder
+        Profil ändern, und wird nur auf Knopfdruck neu eingeholt
+  - [x] Stufe 1 von Hand: Seite „🤖 KI-Auswahl“ zeigt den Prompt zum Kopieren, die Antwort wird als JSON eingefügt
+  - [ ] Stufe 2 automatisch: Warteschlange über HTTP-Endpunkte + Worker mit Claude Code auf dem Server
+  - [ ] Stufe 3: Anthropic-API als austauschbares Backend (Einstellung `ai_backend`)
+  - [ ] KI-Treffer in der täglichen E-Mail kennzeichnen
 - [ ] Bearbeitungsstatus (in Prüfung / Angebot abgegeben / abgesagt / gewonnen)
 
 ## Start-Regeln (in der App anpassbar)

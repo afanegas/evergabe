@@ -6,6 +6,10 @@ CPV-Prüfung:      Treffer, wenn ein CPV-Code des Eintrags unter einen Code der 
 Stichwort-Prüfung: Treffer, wenn ein Stichwort im Text vorkommt und kein Ausschluss-Stichwort.
 Wichtige Stichwörter: zählen wie normale Stichwörter. Trifft eines (und die Stichwort-Prüfung ist nicht
                   ausgeschlossen), wird der Eintrag zusätzlich als wichtig markiert und oben einsortiert.
+KI-Auswahl:       Das Urteil der KI wird hier nur abgelesen (Spalte ai_result), nie neu erfragt – siehe app/ai.py.
+                  Im Modus "markierung" (Standard) ändert es die Einstufung nicht und markiert nur interessante
+                  Einträge; im Modus "pruefung" zählt es wie CPV und Stichwörter mit (ODER/UND).
+                  "unklar" gilt als kein Treffer, ein fehlendes Urteil zählt wie eine abgeschaltete Prüfung nicht mit.
 Niedrige Priorität: eigene Stichwort-Liste, wirkt nur auf Markierung und Sortierung (nicht auf interessant /
                   nicht interessant) und nur bei interessanten Einträgen. Geprüft wird im Titel (Standard) oder im
                   ganzen Text (Einstellung). Trifft ein Eintrag
@@ -27,6 +31,12 @@ KEIN_TREFFER = "kein_treffer"
 KEINE_CODES = "keine_codes"
 AUSGESCHLOSSEN = "ausgeschlossen"
 AUS = "aus"
+UNKLAR = "unklar"  # Antwort der KI; gilt als kein Treffer
+KEIN_URTEIL = "kein_urteil"  # noch nicht bewertet; zählt nicht mit
+
+# Betriebsarten der KI-Auswahl
+AI_MARKIERUNG = "markierung"  # nur Markierung, ändert die Einstufung nicht
+AI_PRUEFUNG = "pruefung"  # dritte Prüfung neben CPV und Stichwörtern
 
 # Sortierstufen innerhalb einer Gruppe (höher = weiter oben)
 LEVEL_WICHTIG = 2
@@ -47,6 +57,8 @@ class Rules:
     priority_conflict: str = "wichtig"  # wichtig | niedrig | beide
     cpv_enabled: bool = True
     keyword_enabled: bool = True
+    ai_enabled: bool = False
+    ai_mode: str = AI_MARKIERUNG  # markierung | pruefung
     combine: str = "oder"
 
 
@@ -63,6 +75,8 @@ class Result:
     lowprio_matches: list[str] = field(default_factory=list)
     low_priority: bool = False
     level: int = LEVEL_NORMAL
+    ai: str = AUS
+    ai_match: bool = False
 
 
 def cpv_digits(code: str) -> str:
@@ -167,8 +181,18 @@ def resolve_priority(important: bool, low: bool, conflict: str) -> tuple[bool, b
     return False, False, LEVEL_NORMAL
 
 
+def ai_check(ai_result: str | None, rules: Rules) -> str:
+    """Gespeichertes KI-Urteil als Ergebnis einer Einzelprüfung."""
+    if not rules.ai_enabled:
+        return AUS
+    if not ai_result:
+        return KEIN_URTEIL
+    return TREFFER if ai_result == TREFFER else KEIN_TREFFER
+
+
 def classify(
-    text: str, item_codes: list[str], rules: Rules, title: str | None = None, manual_status: str | None = None
+    text: str, item_codes: list[str], rules: Rules, title: str | None = None, manual_status: str | None = None,
+    ai_result: str | None = None,
 ) -> Result:
     cpv_matches: list[str] = []
     if not rules.cpv_enabled:
@@ -196,7 +220,10 @@ def classify(
         else:
             keyword = TREFFER if keyword_matches else KEIN_TREFFER
 
-    active = [result == TREFFER for result in (cpv, keyword) if result not in (AUS, KEINE_CODES)]
+    ai = ai_check(ai_result, rules)
+    # Im Modus "markierung" wirkt die KI nicht auf die Einstufung, sondern nur auf die Markierung weiter unten.
+    checks = (cpv, keyword, ai) if rules.ai_mode == AI_PRUEFUNG else (cpv, keyword)
+    active = [result == TREFFER for result in checks if result not in (AUS, KEINE_CODES, KEIN_URTEIL)]
     if not active:
         interesting = False
     elif rules.combine == "und":
@@ -212,6 +239,10 @@ def classify(
         keyword == TREFFER and bool(priority_matches), is_interesting and bool(lowprio_matches), rules.priority_conflict
     )
 
+    # Markierung: im Modus "pruefung" bei jedem Treffer, im Modus "markierung" nur bei interessanten Einträgen
+    # (dort werden ohnehin nur diese bewertet – nach einer manuellen Umstufung bleibt die Anzeige so stimmig)
+    ai_match = ai == TREFFER and (rules.ai_mode == AI_PRUEFUNG or is_interesting)
+
     return Result(
         status=status,
         cpv=cpv,
@@ -224,4 +255,6 @@ def classify(
         lowprio_matches=lowprio_matches,
         low_priority=low,
         level=level,
+        ai=ai,
+        ai_match=ai_match,
     )

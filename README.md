@@ -120,6 +120,10 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
   CPV-Treffer mit Bezeichnung; die Quelle und die Kategorie „Bekanntmachung“ nur auf der Detailseite.
 - **Suche**: Suchbegriff und daneben der Suchbereich – überall (Standard), nur Titel, nur Beschreibung,
   nur Auftraggeber oder nur CPV-Code.
+- **Markierungs-Filter**: Kästchen für 🤖 KI-Treffer, ★ Wichtig, ♥ Beobachtet, CPV-Treffer, Stichwort-Treffer
+  und Manuell eingestuft. Mehrere lassen sich kombinieren – dann muss alles zutreffen („nur KI **und**
+  wichtig“). Niedrige Priorität hat eine eigene Auswahl: anzeigen (Standard), ausblenden oder nur niedrige.
+  Frühere Adressen mit einem einzelnen `treffer=…` funktionieren weiterhin.
 - **Auftraggeber**: überall als Link – öffnet in einem neuen Tab die Suche nach dieser Vergabestelle
   (Reiter „Alle“).
 - **Gesehen**: Im Ausschreibungsbereich ist „nur neue“ voreingestellt – die Liste zeigt also nur, was noch
@@ -134,7 +138,14 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
   „♥ Auftraggeber beobachten“ auf der Detailseite oder in den Einstellungen (Name oder Namensteil, `*` und `+`).
   Einträge beobachteter Auftraggeber tragen ♥, werden nicht automatisch gelöscht und stehen in der täglichen E-Mail
   in einem eigenen Abschnitt.
-- **Detailansicht**: Prüfergebnisse (welche CPV-Codes/Stichwörter gegriffen haben), Beschreibung mit Markierungen, Notiz
+- **🤖 KI-Auswahl**: eigener Reiter. Eine KI liest Titel und Beschreibung und entscheidet anhand des
+  Leistungsprofils, ob die Bekanntmachung zum Angebot passt. Die Seite zeigt den fertigen Prompt zum Kopieren
+  (Profil + die offenen Einträge); die Antwort wird als JSON wieder eingefügt. Die Zahl im Menü ist die Anzahl
+  der offenen Bewertungen. Treffer tragen in der Liste „🤖 KI“, stehen in ihrer Gruppe ganz oben (noch vor
+  ★ wichtig) und lassen sich über die Markierungs-Filter einzeln anzeigen; die Begründung steht auf der
+  Detailseite.
+- **Detailansicht**: Prüfergebnisse (welche CPV-Codes/Stichwörter gegriffen haben, Urteil der KI mit Begründung),
+  Beschreibung mit Markierungen, Notiz
 - **Einstellungen**:
   - CPV-Prüfung und Stichwort-Prüfung einzeln an/aus, Verknüpfung ODER / UND
   - E-Mail: mehrere Empfänger (pro Zeile oder durch Komma getrennt), alle bekommen dieselbe Mail
@@ -149,6 +160,10 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
     Einstellbar: prüfen nur im Titel (Standard) oder in Titel und Beschreibung; bei gleichzeitigem ★ wichtigem
     Stichwort: Wichtig gewinnt (Standard) / Niedrig gewinnt / Beides (Mitte).
     Wichtige Stichwörter zählen wie normale, markieren Treffer aber als „★ WICHTIG“ und sortieren sie in jeder Gruppe nach oben.
+  - 🤖 KI-Auswahl: an/aus, Betriebsart (nur Markierung / dritte Prüfung), Regionen, Obergrenze je Durchgang,
+    Höchstalter der Bekanntmachungen (Standard 30 Tage, 0 = ohne Grenze – so sammelt sich nach einer Pause
+    kein Berg alter Einträge an) und das Leistungsprofil als freier Text. „Veraltete Urteile neu bewerten“ verwirft Urteile, die nicht mehr
+    zum Profil oder zum Text passen, und reiht die Einträge wieder ein.
   - Feeds einzeln an-/abschalten (neue Quellen brauchen eine eigene Anbindung im Code)
   - Aktualisierung: feste Uhrzeiten (Start: 07:00, 13:00) oder Intervall
   - Abrufprotokoll
@@ -159,8 +174,19 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
 |---|---|
 | CPV | ein CPV-Code des Eintrags unter einen Listen-Code fällt (71314000 deckt 71314300 ab) |
 | Stichwort | ein Stichwort in Titel/Auftragsgegenstand/Art der Leistung/Kurzbeschreibung vorkommt und kein Ausschluss-Stichwort |
+| 🤖 KI | die KI den Eintrag am Leistungsprofil für passend hält (nur in der Betriebsart „dritte Prüfung“) |
 
 Einträge ohne CPV-Codes (Vergebene Aufträge, Vorinformationen) werden nur über Stichwörter bewertet.
+
+Die KI-Auswahl verhält sich anders als die beiden anderen Prüfungen, weil eine Bewertung Zeit und Geld kostet:
+Das Urteil wird gespeichert und bei einer Neu-Klassifizierung nur abgelesen, nie erneut erfragt. Bewertet wird ein
+Eintrag nur einmal – erst wenn sich der bewertete Text oder das Leistungsprofil ändert, gilt das Urteil als veraltet,
+und auch dann wird es nur auf Knopfdruck neu eingeholt. Bewertet wird außerdem nur, was gerade in Frage kommt:
+passende Region, Frist nicht abgelaufen, nicht älter als eingestellt – und in der Betriebsart „nur Markierung“ nur,
+was ohnehin interessant ist. Ändert sich eine dieser Einstellungen, räumt die App die Warteschlange entsprechend auf. In der Betriebsart „nur Markierung“ (Standard) bekommt die KI
+ausschließlich Einträge zu sehen, die über CPV oder Stichwörter schon interessant sind, und ihr Urteil ändert die
+Einstufung nicht; in der Betriebsart „dritte Prüfung“ bewertet sie alle Einträge der gewählten Regionen und zählt
+wie CPV und Stichwörter mit (ODER/UND). Antwortet sie „unklar“, gilt das als kein Treffer.
 
 Zu jedem CPV-Code zeigt die App eine Bezeichnung: zuerst die Angabe der Quelle am Eintrag, dann eine eigene
 Bezeichnung aus der CPV-Liste, sonst den amtlichen Titel aus `app/cpv_de.json.gz`. Das ist der deutsche Teil des
@@ -178,6 +204,11 @@ Für jedes Stichwort ist wählbar, ob im Titel und in der Beschreibung oder nur 
 Regeln und Einstellungen liegen in der Datenbank (`data/ev-checker.db`), nicht im Code: Updates (`git pull`, neues Image)
 überschreiben sie nicht. Die Start-Regeln werden nur beim allerersten Start angelegt; nachträglich ergänzte Standard-Regeln
 (z. B. „Energiemanagementsystem“) kommen einmalig hinzu und bleiben gelöscht, wenn man sie entfernt.
+
+Dubletten zwischen den Quellen werden über Titel und Auftraggeber erkannt. Dabei gelten „für“ und „fuer“,
+„Mobilität“ und „Mobilitaet“ als gleich – oeffentlichevergabe.de schreibt Umlaute teilweise aus, die
+Vergabeplattform Berlin nicht. Die Angleichung wirkt beim Abruf, bereits doppelt gespeicherte Einträge
+bleiben getrennt.
 
 Kann eine aktive Quelle 2× oder öfter hintereinander nicht abgerufen werden, zeigt jede Seite oben eine Warnung.
 

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}KI-Auswahl{% endblock %}
+{% block page %}ki{% endblock %}
+{% block next_url %}/ki{% endblock %}
+
+{% block content %}
+<h1>🤖 KI-Auswahl</h1>
+
+{% if errors %}
+  <div class="banner banner-error" role="alert">
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+{% endif %}
+
+{% if not values.ai_enabled %}
+  <div class="banner banner-warn">
+    Die KI-Auswahl ist ausgeschaltet{% if not values.ai_profile %} und es ist noch kein Leistungsprofil hinterlegt{% endif %} –
+    <a href="/einstellungen#ki">jetzt in den Einstellungen einrichten</a>.
+  </div>
+{% endif %}
+
+<section class="card">
+  <h2>Stand</h2>
+  <p class="muted">
+    Betriebsart: <strong>{{ 'dritte Prüfung' if values.ai_mode == 'pruefung' else 'nur Markierung' }}</strong> ·
+    Regionen: <strong>{{ values.ai_regions | map('capitalize') | join(', ') or '–' }}</strong> ·
+    höchstens <strong>{{ values.ai_max_per_run }}</strong> Einträge je Durchgang ·
+    {% if values.ai_max_age_days %}nur die letzten <strong>{{ values.ai_max_age_days }}</strong> Tage{% else %}ohne Altersgrenze{% endif %}.
+    <a href="/einstellungen#ki">ändern</a>
+  </p>
+  <p>
+    Im Blick: {{ ai_status.gesamt }} Einträge · bewertet: {{ ai_status.bewertet }} ·
+    davon passend: {{ ai_status.treffer }} · <strong>offen: {{ ai_status.offen }}</strong>
+  </p>
+  <form method="post" action="/ki/aktualisieren" class="inline">
+    <button class="btn" type="submit">Warteschlange aktualisieren</button>
+  </form>
+  <small class="muted">Nach jedem Abruf geschieht das automatisch – hier nur, wenn du nicht warten willst.</small>
+</section>
+
+{% if items %}
+<section class="card">
+  <h2>1. Anfrage kopieren</h2>
+  <p class="muted">
+    {{ items | length }} Eintr{{ 'äge' if items | length != 1 else 'ag' }} warten auf ein Urteil. Kopiere den Text
+    und füge ihn in eine Claude-Sitzung ein. Die Antwort kommt als JSON zurück – die fügst du unten wieder ein.
+  </p>
+  <details>
+    <summary>Welche Einträge sind in dieser Anfrage?</summary>
+    <ul class="ki-items">
+      {% for item in items %}
+        <li><code>{{ item.id }}</code> <a href="/eintrag/{{ item.id }}?zurueck=/ki">{{ item.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </details>
+  <textarea id="ki-prompt" class="ki-text" rows="14" readonly>{{ prompt }}</textarea>
+  <div class="mail-actions">
+    <button class="btn btn-primary" type="button" data-copy="#ki-prompt">Anfrage in die Zwischenablage kopieren</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>2. Antwort einfügen</h2>
+  <form method="post" action="/ki/ergebnis">
+    <textarea name="antwort" class="ki-text" rows="10"
+              placeholder='[{"id": {{ items[0].id }}, "interessant": true, "sicherheit": "hoch", "begruendung": "…"}]'>{{ antwort }}</textarea>
+    <div class="mail-actions">
+      <button class="btn btn-primary" type="submit">Urteile speichern</button>
+    </div>
+  </form>
+  <small class="muted">
+    Code-Zäune und Begleittext um das JSON herum sind in Ordnung. Nummern, die es nicht gibt, werden
+    übersprungen; ein unvollständiges JSON wird abgelehnt, damit kein halbes Urteil gespeichert wird.
+  </small>
+</section>
+{% elif values.ai_enabled %}
+<div class="empty">
+  <p><strong>Keine offenen Bewertungen.</strong></p>
+  <p>Neue Einträge kommen nach dem nächsten Abruf automatisch in die Warteschlange.</p>
+</div>
+{% endif %}
+
+{% if judged %}
+<section class="card">
+  <h2>Zuletzt bewertet</h2>
+  <div class="table-wrap">
+    <table class="tenders">
+      <thead><tr><th>Titel</th><th>Urteil</th><th>Begründung</th><th>Einstufung</th><th>Wann</th></tr></thead>
+      <tbody>
+        {% for item in judged %}
+          <tr>
+            <td class="title-cell"><a href="/eintrag/{{ item.id }}?zurueck=/ki">{{ item.title }}</a></td>
+            <td class="nowrap">
+              {% if item.ai_result == 'treffer' %}<span class="chip chip-ai">KI ✓</span>
+              {% elif item.ai_result == 'unklar' %}<span class="chip chip-na">KI ?</span>
+              {% else %}<span class="chip chip-miss">KI ✗</span>{% endif %}
+            </td>
+            <td>{{ item.ai_reason or '–' }}</td>
+            <td class="nowrap">{{ 'interessant' if item.status == 'interessant' else 'nicht interessant' }}
+              {% if item.manual_status %}<small class="muted">manuell</small>{% endif %}</td>
+            <td class="nowrap">{{ item.ai_checked_at | dt }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

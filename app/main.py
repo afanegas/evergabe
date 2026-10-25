@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
-from . import backup, classify, config, cpv, fetcher, mailer, scheduler, settings, tenders
+from . import ai, backup, classify, config, cpv, fetcher, mailer, scheduler, settings, tenders
 from .db import init_db, now
 from .categories import CATEGORY_LABELS, CATEGORY_SHORT, REGION_LABELS, SOURCE_LABELS, SOURCE_OV
 from .sources.berlin import FEEDS, Feed
@@ -189,6 +189,7 @@ templates.env.globals.update(
     REGION_LABELS=REGION_LABELS,
     SOURCE_LABELS=SOURCE_LABELS,
     SEARCH_FIELD_LABELS=tenders.SEARCH_FIELD_LABELS,
+    TREFFER_FILTERS=tenders.TREFFER_FILTERS,
     UNLABELLED_CATEGORIES=tenders.UNLABELLED_CATEGORIES,
     fetch_state=fetcher.state,
     cpv_code_hit=cpv_code_hit,
@@ -198,6 +199,7 @@ templates.env.globals.update(
     source_warnings=source_warnings,
     run_duration=run_duration,
     asset=asset,
+    ai_open=ai.open_count,
 )
 
 
@@ -228,6 +230,15 @@ def _filters_from(params: dict, default_status: str = "interessant", default_neu
     """Filter aus den Parametern der Seite. `neu` ist im Ausschreibungsbereich voreingestellt: Das Formular
     schickt darum immer einen Wert mit (0 oder 1), sonst wäre „Haken raus“ nicht von „nichts gewählt“
     zu unterscheiden."""
+    # Markierungen sind kombinierbar und kommen als eigene Felder (t_ki, t_wichtig …). Frühere Adressen
+    # mit einem einzelnen „treffer“-Wert (Lesezeichen, alte Links) gelten weiter.
+    treffer = tuple(key for key in tenders.TREFFER_FILTERS if params.get(f"t_{key}"))
+    einzeln = params.get("treffer", "")
+    if einzeln in tenders.TREFFER_FILTERS and einzeln not in treffer:
+        treffer += (einzeln,)
+    niedrig = params.get("niedrig", "")
+    if einzeln == "niedrig":
+        niedrig = "nur"
     return tenders.Filters(
         status=params.get("status", default_status),
         kategorie=params.get("kategorie", ""),
@@ -235,7 +246,8 @@ def _filters_from(params: dict, default_status: str = "interessant", default_neu
         q=params.get("q", "").strip(),
         suchfeld=params.get("suchfeld", ""),
         vergabestelle=params.get("vergabestelle", "").strip(),
-        treffer=params.get("treffer", ""),
+        treffer=treffer,
+        niedrig=niedrig if niedrig in ("nur", "ohne") else "",
         frist=params.get("frist", ""),
         neu=params.get("neu", "1" if default_neu else "") == "1",
         sort=params.get("sort", "neueste"),
@@ -431,6 +443,62 @@ async def mark_view_seen(request: Request):
 
 # ---------- Detail ----------
 
+# ---------- KI-Auswahl ----------
+
+AI_PAGE = "/ki"
+
+
+def _ai_context(request: Request, **extra) -> HTMLResponse:
+    values = settings.get_all()
+    items = ai.pending(values=values) if values["ai_enabled"] else []
+    context = {
+        "values": values,
+        "items": items,
+        "prompt": ai.build_prompt(items, values["ai_profile"]) if items else "",
+        "ai_status": ai.status(values),
+        "judged": ai.recent(),
+        "errors": [],
+        "meldung": "",
+        "antwort": "",
+    }
+    context.update(extra)
+    return templates.TemplateResponse(request, "ki.html", context)
+
+
+@app.get(AI_PAGE, response_class=HTMLResponse)
+def ai_view(request: Request, meldung: str = ""):
+    return _ai_context(request, meldung=meldung)
+
+
+@app.post(AI_PAGE + "/aktualisieren")
+def ai_refresh_queue():
+    queued = ai.mark_candidates()
+    return _redirect(AI_PAGE, meldung=(
+        f"Warteschlange aktualisiert – {queued} Einträge dazugekommen." if queued
+        else "Warteschlange aktualisiert – es wartet nichts Neues."
+    ))
+
+
+@app.post(AI_PAGE + "/ergebnis", response_class=HTMLResponse)
+async def ai_apply(request: Request):
+    """Die eingefügte Antwort auswerten und die Urteile speichern."""
+    form = await request.form()
+    antwort = form.get("antwort") or ""
+    entries, errors = ai.parse_answer(antwort)
+    if not entries:
+        return _ai_context(request, errors=errors or ["Die Antwort enthielt keine Urteile."], antwort=antwort)
+    result = ai.apply_results(entries)
+    fetcher.reclassify(result["saved"])  # erst jetzt wirkt das Urteil auf Markierung bzw. Einstufung
+    if result["unknown"]:
+        errors.append("Übersprungen, weil es diese Nummern nicht gibt: "
+                      + ", ".join(str(i) for i in result["unknown"]))
+    count = len(result["saved"])
+    meldung = f"{count} Urteil{'e' if count != 1 else ''} gespeichert."
+    if errors:
+        return _ai_context(request, errors=errors, meldung=meldung)
+    return _redirect(AI_PAGE, meldung=meldung)
+
+
 @app.get("/eintrag/{tender_id}", response_class=HTMLResponse)
 def detail_view(request: Request, tender_id: int, zurueck: str = "/", meldung: str = ""):
     item = tenders.get(tender_id)
@@ -517,6 +585,7 @@ def _settings_context(request: Request, **extra) -> HTMLResponse:
         "feeds": feeds,
         "retention_days": config.REST_RETENTION_DAYS,
         "rules": settings.all_rules(),
+        "ai_status": ai.status(values),
         "authority_names": tenders.overview()["authorities"],
         "rules_dirty": False,
         "times_text": ", ".join(values["schedule_times"]),
@@ -569,6 +638,34 @@ async def save_classification(request: Request):
         "/einstellungen",
         meldung=f"Gespeichert – {counts['gesamt']} Einträge neu klassifiziert, davon {counts['interessant']} interessant.",
     )
+
+
+@app.post("/einstellungen/ki")
+async def save_ai(request: Request):
+    form = await request.form()
+    values, errors = settings.parse_ai_form(form)
+    if errors:
+        # Eingaben behalten, damit das Profil nicht verloren geht
+        return _settings_context(request, errors=errors, values={**settings.get_all(), **values})
+    settings.set_many(values)
+    counts = fetcher.reclassify_all()  # Schalter und Betriebsart wirken auf Einstufung und Markierung
+    queued = ai.mark_candidates()
+    if not values["ai_enabled"]:
+        meldung = "KI-Einstellungen gespeichert – die KI-Auswahl ist ausgeschaltet."
+    else:
+        meldung = (f"KI-Einstellungen gespeichert – {counts['gesamt']} Einträge neu klassifiziert, "
+                   f"{queued} warten auf eine Bewertung.")
+    return _redirect("/einstellungen#ki", meldung=meldung)
+
+
+@app.post("/einstellungen/ki/neu-bewerten")
+def ai_requeue():
+    """Alle Urteile verwerfen, die nicht zum aktuellen Text und Profil passen, und neu einreihen."""
+    queued = ai.requeue_stale()
+    return _redirect("/einstellungen#ki", meldung=(
+        f"{queued} Einträge warten auf eine neue Bewertung." if queued
+        else "Alle Urteile sind aktuell – es wurde nichts neu eingereiht."
+    ))
 
 
 @app.post("/einstellungen/feeds")
