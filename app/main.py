@@ -640,6 +640,13 @@ async def save_classification(request: Request):
     )
 
 
+def _ai_classification_key(values: dict) -> tuple:
+    """Die beiden Werte, die auf die Einstufung wirken. Profil, Regionen, Obergrenzen und Höchstalter
+    ändern nur, *was* bewertet wird – dafür muss nichts neu klassifiziert werden (das dauert bei
+    vielen Einträgen eine Weile)."""
+    return (bool(values["ai_enabled"]) and bool((values["ai_profile"] or "").strip()), values["ai_mode"])
+
+
 @app.post("/einstellungen/ki")
 async def save_ai(request: Request):
     form = await request.form()
@@ -647,14 +654,18 @@ async def save_ai(request: Request):
     if errors:
         # Eingaben behalten, damit das Profil nicht verloren geht
         return _settings_context(request, errors=errors, values={**settings.get_all(), **values})
+    vorher = settings.get_all()
     settings.set_many(values)
-    counts = fetcher.reclassify_all()  # Schalter und Betriebsart wirken auf Einstufung und Markierung
+    counts = None
+    if _ai_classification_key(vorher) != _ai_classification_key({**vorher, **values}):
+        counts = fetcher.reclassify_all()
     queued = ai.mark_candidates()
     if not values["ai_enabled"]:
         meldung = "KI-Einstellungen gespeichert – die KI-Auswahl ist ausgeschaltet."
     else:
-        meldung = (f"KI-Einstellungen gespeichert – {counts['gesamt']} Einträge neu klassifiziert, "
-                   f"{queued} warten auf eine Bewertung.")
+        meldung = f"KI-Einstellungen gespeichert – {queued} Einträge warten auf eine Bewertung."
+        if counts:
+            meldung += f" {counts['gesamt']} Einträge wurden neu klassifiziert."
     return _redirect("/einstellungen#ki", meldung=meldung)
 
 

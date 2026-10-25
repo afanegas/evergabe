@@ -330,3 +330,17 @@ def test_stale_verdict_is_not_requeued_on_its_own(client):
     assert field(tender_id, "ai_state") == (ai.STATE_OK,)
     assert ai.requeue_stale() > 0
     assert field(tender_id, "ai_state") == (ai.STATE_OPEN,)
+
+
+def test_saving_the_profile_alone_does_not_reclassify(client, monkeypatch):
+    """Profil, Regionen und Obergrenzen ändern nicht die Einstufung – das Neu-Klassifizieren
+    dauert bei vielen Einträgen zu lange, um es unnötig auszulösen."""
+    enable(AI_MARKIERUNG)
+    laeufe = []
+    monkeypatch.setattr(fetcher, "reclassify_all", lambda *a, **k: laeufe.append(1) or {"gesamt": 0, "interessant": 0})
+    daten = {"ai_enabled": "1", "ai_mode": AI_MARKIERUNG, "ai_profile": PROFIL + " Neuer Satz.",
+             "ai_region_berlin": "1", "ai_max_per_run": "25", "ai_max_age_days": "0"}
+    client.post("/einstellungen/ki", data=daten)
+    assert laeufe == []
+    client.post("/einstellungen/ki", data={**daten, "ai_mode": AI_PRUEFUNG})  # Betriebsart wirkt
+    assert len(laeufe) == 1

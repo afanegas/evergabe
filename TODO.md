@@ -140,8 +140,26 @@ Stand: 13.09.2026 (Phase 1 fertig)
   - [x] Urteil wird gespeichert, eine Neu-Klassifizierung liest es nur ab; veraltet erst, wenn sich Text oder
         Profil ändern, und wird nur auf Knopfdruck neu eingeholt
   - [x] Stufe 1 von Hand: Seite „🤖 KI-Auswahl“ zeigt den Prompt zum Kopieren, die Antwort wird als JSON eingefügt
-  - [ ] Stufe 2 automatisch: Warteschlange über HTTP-Endpunkte + Worker mit Claude Code auf dem Server
-  - [ ] Stufe 3: Anthropic-API als austauschbares Backend (Einstellung `ai_backend`)
+  - [ ] **Stufe 2 automatisch: Worker mit Claude Code auf dem Server** (Plan)
+    - [ ] Zwei Endpunkte in der App: `GET /api/ki/offen` (Profil + Einträge + fertiger Prompt) und
+          `POST /api/ki/ergebnis` (dieselbe Auswertung wie das Formular). Zugang über ein Token aus
+          der `.env` (`EVC_AI_TOKEN`), erreichbar nur im Docker-Netz – nicht über Traefik
+    - [ ] Worker-Skript `worker/ki_worker.py`: offene Einträge holen, Claude Code im Kopfmodus
+          aufrufen (`claude -p --output-format json`, **ohne Werkzeuge**: `--allowedTools ""` und
+          `--permission-mode dontAsk`, leeres Arbeitsverzeichnis), Antwort validieren und
+          zurückschicken; Schleife bis nichts mehr offen ist oder das Tageslimit erreicht ist
+    - [ ] Probelauf-Schalter (`--trocken`): antwortet „unklar“ ohne Claude – damit ist die ganze
+          Strecke ohne Token und ohne Kosten testbar
+    - [ ] Eigener Container `ev-checker-ki` im selben Compose-Projekt: Node bzw. Claude-Binary,
+          beschreibbares HOME, `CLAUDE_CODE_OAUTH_TOKEN` aus der `.env`, kein Traefik-Label,
+          kein Zugriff auf das Projektverzeichnis
+    - [ ] Anstoß nach jedem Abruf (oder eigener Zeitplan), Tageslimit gegen Abo-Grenzen
+    - [ ] Fehler sichtbar machen: `ai_state='fehler'`, `ai_error`, letzter Worker-Lauf in den
+          Einstellungen; die Seite „KI-Auswahl“ bleibt als Rückfallebene von Hand bedienbar
+    - [ ] Offen zu klären: Nutzungsgrenzen des Abos und ob automatisierter Serverbetrieb davon
+          gedeckt ist; Token läuft ab und muss erneuert werden
+  - [ ] Stufe 3: Anthropic-API als austauschbares Backend (Einstellung `ai_backend`) – ein HTTP-Aufruf
+        statt Agent, deterministisches Schema, Kosten im Cent-Bereich je Monat
   - [ ] KI-Treffer in der täglichen E-Mail kennzeichnen
 - [ ] Bearbeitungsstatus (in Prüfung / Angebot abgegeben / abgesagt / gewonnen)
 
