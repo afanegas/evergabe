@@ -329,3 +329,7 @@ mark { background: #ffe3a3; padding: 0 0.1rem; border-radius: 2px; }
 /* Kombinierbare Markierungs-Filter über der Liste */
 .filter-marks { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.8rem; }
 .filter-marks .check { font-size: 0.85rem; }
+
+/* Begründung der KI-Auswahl in der Listenzeile: zwischen Titel und Auftraggeber */
+.ki-hinweis { font-size: 0.83rem; color: var(--muted); margin: 0.15rem 0 0; }
+.ki-hinweis.is-hit { color: #1b4a8a; }

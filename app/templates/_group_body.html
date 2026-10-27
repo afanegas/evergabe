@@ -25,6 +25,9 @@
           {% if not item.seen_at %}<span class="pill-new">NEU</span>{% endif %}
           <a href="/eintrag/{{ item.id }}?zurueck={{ group_url | urlencode }}">{{ item.title }}</a>
         </div>
+        {% if item.ai_result and item.ai_reason %}
+          <div class="ki-hinweis{{ ' is-hit' if item.ai_match }}">KI-Einschätzung: {{ item.ai_reason }}</div>
+        {% endif %}
         <div class="sub">
           {% if item.category not in UNLABELLED_CATEGORIES %}
             <span class="cat cat-{{ item.category }}">{{ CATEGORY_SHORT[item.category] }}</span>

@@ -177,8 +177,9 @@ Wichtig: nur **ein** Prozess (kein `--reload`, keine mehreren Worker), da der Ze
   Leistungsprofils, ob die Bekanntmachung zum Angebot passt. Die Seite zeigt den fertigen Prompt zum Kopieren
   (Profil + die offenen Einträge); die Antwort wird als JSON wieder eingefügt. Die Zahl im Menü ist die Anzahl
   der offenen Bewertungen. Treffer tragen in der Liste „🤖 KI“, stehen in ihrer Gruppe ganz oben (noch vor
-  ★ wichtig) und lassen sich über die Markierungs-Filter einzeln anzeigen; die Begründung steht auf der
-  Detailseite.
+  ★ wichtig) und lassen sich über die Markierungs-Filter einzeln anzeigen. Bei jedem bewerteten Eintrag steht
+  die Begründung in der Listenzeile zwischen Titel und Auftraggeber („KI-Einschätzung: …“) – auch bei einer
+  Absage, damit man sieht, warum etwas nicht passt.
 - **Detailansicht**: Prüfergebnisse (welche CPV-Codes/Stichwörter gegriffen haben, Urteil der KI mit Begründung),
   Beschreibung mit Markierungen, Notiz
 - **Einstellungen**:

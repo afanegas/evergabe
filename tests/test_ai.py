@@ -515,3 +515,27 @@ def test_daily_mail_goes_out_at_once_when_nothing_is_open(monkeypatch):
     monkeypatch.setattr(scheduler.ai, "mail_should_wait", lambda: 0)
     scheduler._run_digest()
     assert versandt == [1] and fake.jobs == []
+
+
+def test_list_shows_the_ai_reason_under_the_title(client):
+    enable(AI_MARKIERUNG)
+    tender_id = one(INTERESSANT)
+    judge(tender_id, reason="Energiekonzept für eine Schule, passt zur Gebäudeberatung")
+    text = client.get("/?status=alle&neu=0&frist=alle&t_ki=1").text
+    assert "KI-Einschätzung: Energiekonzept für eine Schule, passt zur Gebäudeberatung" in text
+    # steht zwischen Titel und Auftraggeber
+    zeile = text[text.index("KI-Einschätzung"):]
+    assert zeile.index("</div>") < zeile.index("class=\"sub\"")
+
+
+def test_list_also_shows_the_reason_for_a_rejection(client):
+    enable(AI_MARKIERUNG)
+    tender_id = one(INTERESSANT)
+    judge(tender_id, "kein_treffer", "Bauleistung nach VOB, keine Beratung")
+    text = client.get("/?status=alle&neu=0&frist=alle").text
+    assert "KI-Einschätzung: Bauleistung nach VOB, keine Beratung" in text
+
+
+def test_list_stays_clean_without_a_verdict(client):
+    enable(AI_MARKIERUNG)
+    assert "KI-Einschätzung" not in client.get("/?status=alle&neu=0&frist=alle").text
